@@ -4,9 +4,35 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Fault Codes — Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+
+    <!-- AUTH CHECK -->
+    <script>
+    (function() {
+        var isAuth = false;
+        try {
+            if (sessionStorage.getItem('mtp_auth') === 'true') {
+                isAuth = true;
+            }
+        } catch(e) {}
+        if (!isAuth) {
+            try {
+                var remembered = localStorage.getItem('mtp_auth_expires');
+                if (remembered && Date.now() < parseInt(remembered)) {
+                    sessionStorage.setItem('mtp_auth', 'true');
+                    isAuth = true;
+                }
+            } catch(e) {}
+        }
+        if (!isAuth) {
+            window.location.replace('login.html');
+        }
+    })();
+    </script>
 
     <!-- TOP BAR -->
     <header class="top-bar">
@@ -41,65 +67,103 @@
             <button class="filter-btn" id="sevShutdown" onclick="setSevFilter('shutdown')">Shutdown</button>
         </div>
 
+        <!-- Loading indicator -->
+        <div id="loadingMsg" style="text-align:center; padding:40px; color:#7f8c8d;">
+            <div style="font-size:24px;">⏳</div>
+            <div style="margin-top:8px;">Loading fault codes...</div>
+        </div>
+
         <!-- Results count -->
-        <div id="resultCount" style="font-size:13px; color:#7f8c8d; margin-bottom:12px;"></div>
+        <div id="resultCount" style="font-size:13px; color:#7f8c8d; margin-bottom:12px; display:none;"></div>
 
         <!-- Results will appear here -->
         <div id="results"></div>
 
     </div>
 
-    <!-- Load the fault code data file FIRST -->
-    <script src="js/faultCodes.js"></script>
-
-    <!-- Then the logic that uses it -->
+    <!--
+        LOAD FAULT CODE DATA
+        Try multiple approaches to make sure it loads on all devices
+    -->
     <script>
+        // Flag to track if data loaded
+        window.faultCodesLoaded = false;
+    </script>
+
+    <script src="js/faultCodes.js" onerror="handleLoadError()"></script>
+
+    <script>
+
+    // Check if the file loaded
+    function handleLoadError() {
+        document.getElementById('loadingMsg').innerHTML =
+            '<div style="color:#e74c3c; font-size:16px; font-weight:700;">Error loading fault codes</div>' +
+            '<div style="color:#e74c3c; margin-top:8px;">The file js/faultCodes.js could not be loaded.</div>' +
+            '<div style="color:#999; margin-top:12px; font-size:13px;">Try refreshing the page. If offline, make sure you loaded the page at least once while connected to the internet.</div>' +
+            '<button onclick="window.location.reload()" style="margin-top:16px; padding:10px 24px; background:#1a3a5c; color:#fff; border:none; border-radius:8px; font-size:14px;">Refresh Page</button>';
+    }
 
     // Current filter settings
     var mfgFilter = 'all';
     var sevFilter = 'all';
 
     // =============================================
-    // RUN WHEN PAGE LOADS
-    // Shows all codes immediately
+    // INITIALIZE WHEN PAGE LOADS
     // =============================================
-    window.onload = function() {
+    function initFaultCodes() {
 
-        // Check that the data file loaded
-        if (!window.faultCodeDatabase) {
-            document.getElementById('results').innerHTML =
-                '<div style="padding:40px; text-align:center; color:red;">' +
-                '<p style="font-size:18px; font-weight:700;">Error: Fault code data not loaded</p>' +
-                '<p style="margin-top:8px;">Make sure the file <strong>js/faultCodes.js</strong> exists in your js folder.</p>' +
-                '</div>';
+        // Check that data exists
+        if (!window.faultCodeDatabase || !window.faultCodeDatabase.length) {
+            handleLoadError();
             return;
         }
 
-        // Show all codes on first load
+        // Hide loading message
+        document.getElementById('loadingMsg').style.display = 'none';
+        document.getElementById('resultCount').style.display = 'block';
+
+        // Show all codes
         runSearch();
 
-        // Set up the search box to filter as you type
+        // Set up search box
         var searchBox = document.getElementById('searchBox');
+
         searchBox.addEventListener('input', function() {
             runSearch();
         });
 
-        // Also handle Enter key (just runs the same search)
         searchBox.addEventListener('keydown', function(e) {
             if (e.key === 'Enter') {
                 e.preventDefault();
                 runSearch();
             }
         });
-    };
+    }
+
+    // Try to initialize — use multiple approaches for mobile compatibility
+    if (document.readyState === 'complete' || document.readyState === 'interactive') {
+        // Page already loaded
+        setTimeout(initFaultCodes, 100);
+    } else {
+        document.addEventListener('DOMContentLoaded', function() {
+            setTimeout(initFaultCodes, 100);
+        });
+    }
+
+    // Also try on window load as a fallback
+    window.addEventListener('load', function() {
+        if (!window.faultCodesLoaded) {
+            window.faultCodesLoaded = true;
+            initFaultCodes();
+        }
+    });
 
     // =============================================
-    // SET MANUFACTURER FILTER
+    // MANUFACTURER FILTER
     // =============================================
     function setMfgFilter(value) {
         mfgFilter = value;
 
-        // Update button styles
         document.getElementById('filterAll').className = 'filter-btn';
         document.getElementById('filterMercury').className = 'filter-btn';
         document.getElementById('filterYamaha').className = 'filter-btn';
@@ -112,7 +176,7 @@
     }
 
     // =============================================
-    // SET SEVERITY FILTER
+    // SEVERITY FILTER
     // =============================================
     function setSevFilter(value) {
         sevFilter = value;
@@ -131,32 +195,33 @@
     }
 
     // =============================================
-    // MAIN SEARCH FUNCTION
-    // Runs every time you type or change a filter
+    // MAIN SEARCH
     // =============================================
     function runSearch() {
+
+        if (!window.faultCodeDatabase) return;
+
         var searchText = document.getElementById('searchBox').value.toLowerCase().trim();
         var matchingCodes = [];
 
-        // Loop through every fault code in the database
         for (var i = 0; i < window.faultCodeDatabase.length; i++) {
             var code = window.faultCodeDatabase[i];
 
-            // Check manufacturer filter
+            // Manufacturer filter
             if (mfgFilter !== 'all') {
                 if (code.manufacturer.toLowerCase() !== mfgFilter) {
-                    continue; // skip this code
+                    continue;
                 }
             }
 
-            // Check severity filter
+            // Severity filter
             if (sevFilter !== 'all') {
                 if (code.severity.toLowerCase() !== sevFilter) {
-                    continue; // skip this code
+                    continue;
                 }
             }
 
-            // Check search text (if user typed something)
+            // Text search
             if (searchText.length > 0) {
                 var allText = (
                     code.code + ' ' +
@@ -168,20 +233,18 @@
                 ).toLowerCase();
 
                 if (allText.indexOf(searchText) === -1) {
-                    continue; // skip — doesn't match search
+                    continue;
                 }
             }
 
-            // If we got here, the code matches all filters
             matchingCodes.push(code);
         }
 
-        // Display the matching codes
         showResults(matchingCodes);
     }
 
     // =============================================
-    // TOGGLE DETAIL SECTION ON A FAULT CARD
+    // TOGGLE DETAILS
     // =============================================
     function toggleDetails(cardIndex) {
         var detailDiv = document.getElementById('detail_' + cardIndex);
@@ -191,32 +254,30 @@
 
         if (detailDiv.style.display === 'block') {
             detailDiv.style.display = 'none';
-            toggleBtn.textContent = 'Show Diagnosis Steps ▼';
+            toggleBtn.textContent = 'Show Diagnosis Steps \u25BC';
         } else {
             detailDiv.style.display = 'block';
-            toggleBtn.textContent = 'Hide Details ▲';
+            toggleBtn.textContent = 'Hide Details \u25B2';
         }
     }
 
     // =============================================
-    // DISPLAY RESULTS ON THE PAGE
+    // DISPLAY RESULTS
     // =============================================
     function showResults(codes) {
         var container = document.getElementById('results');
         var countDiv = document.getElementById('resultCount');
         var html = '';
 
-        // Show count
         if (codes.length === 1) {
             countDiv.textContent = '1 code found';
         } else {
             countDiv.textContent = codes.length + ' codes found';
         }
 
-        // No results message
         if (codes.length === 0) {
-            html = html + '<div style="text-align:center; padding:40px 20px; color:#95a5a6;">';
-            html = html + '<div style="font-size:48px; margin-bottom:12px;">🔍</div>';
+            html = '<div style="text-align:center; padding:40px 20px; color:#95a5a6;">';
+            html = html + '<div style="font-size:48px; margin-bottom:12px;">\uD83D\uDD0D</div>';
             html = html + '<div style="font-size:16px; font-weight:600;">No matching fault codes found</div>';
             html = html + '<div style="font-size:14px; margin-top:8px;">Try a different search term or change the filters above.</div>';
             html = html + '</div>';
@@ -224,43 +285,42 @@
             return;
         }
 
-        // Build a card for each matching code
         for (var i = 0; i < codes.length; i++) {
             var c = codes[i];
             var sevLower = c.severity.toLowerCase();
 
             html = html + '<div class="fault-card">';
 
-            // === TOP ROW: Code number and severity badge ===
+            // Top row
             html = html + '<div class="fault-top-row">';
             html = html + '<span class="fault-code-label">' + c.code + '</span>';
             html = html + '<span class="fault-severity-badge ' + sevLower + '">' + c.severity.toUpperCase() + '</span>';
             html = html + '</div>';
 
-            // === Manufacturer and system ===
-            html = html + '<div class="fault-system-label">' + c.manufacturer + ' — ' + c.system + '</div>';
+            // Manufacturer and system
+            html = html + '<div class="fault-system-label">' + c.manufacturer + ' \u2014 ' + c.system + '</div>';
 
-            // === Description ===
+            // Description
             html = html + '<div class="fault-desc">' + c.description + '</div>';
 
-            // === Show/Hide details button ===
+            // Toggle button
             html = html + '<button class="fault-toggle-btn" id="togBtn_' + i + '" onclick="toggleDetails(' + i + ')">';
-            html = html + 'Show Diagnosis Steps ▼';
+            html = html + 'Show Diagnosis Steps \u25BC';
             html = html + '</button>';
 
-            // === Detail section (hidden by default) ===
+            // Detail section
             html = html + '<div id="detail_' + i + '" style="display:none;">';
 
-            // Probable causes
+            // Causes
             html = html + '<div class="fault-section-heading">Probable Causes:</div>';
             html = html + '<div class="fault-section-body">';
             var causeList = c.causes.split('|');
             for (var ca = 0; ca < causeList.length; ca++) {
-                html = html + '• ' + causeList[ca].trim() + '<br>';
+                html = html + '\u2022 ' + causeList[ca].trim() + '<br>';
             }
             html = html + '</div>';
 
-            // Diagnostic steps
+            // Steps
             html = html + '<div class="fault-section-heading">Diagnostic Steps:</div>';
             html = html + '<div class="fault-section-body">';
             var stepList = c.steps.split('|');
@@ -269,20 +329,20 @@
             }
             html = html + '</div>';
 
-            // Tools needed
+            // Tools
             if (c.tools && c.tools.length > 0) {
                 html = html + '<div class="fault-section-heading">Tools Needed:</div>';
                 html = html + '<div class="fault-section-body">' + c.tools + '</div>';
             }
 
-            // Parts commonly needed
+            // Parts
             if (c.parts && c.parts.length > 0) {
                 html = html + '<div class="fault-section-heading">Parts Commonly Needed:</div>';
                 html = html + '<div class="fault-section-body">' + c.parts + '</div>';
             }
 
-            html = html + '</div>'; // close detail section
-            html = html + '</div>'; // close fault-card
+            html = html + '</div>'; // close detail
+            html = html + '</div>'; // close card
         }
 
         container.innerHTML = html;

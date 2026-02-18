@@ -7,6 +7,37 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+<body>
+
+    <!-- AUTH CHECK — MUST BE FIRST THING IN BODY -->
+    <script>
+    (function() {
+        // Check session
+        var isAuth = false;
+
+        try {
+            if (sessionStorage.getItem('mtp_auth') === 'true') {
+                isAuth = true;
+            }
+        } catch(e) {}
+
+        // Check remember me
+        if (!isAuth) {
+            try {
+                var remembered = localStorage.getItem('mtp_auth_expires');
+                if (remembered && Date.now() < parseInt(remembered)) {
+                    sessionStorage.setItem('mtp_auth', 'true');
+                    isAuth = true;
+                }
+            } catch(e) {}
+        }
+
+        // If not authorized, redirect to login
+        if (!isAuth) {
+            window.location.replace('login.html');
+        }
+    })();
+    </script>
 
     <!-- TOP BAR -->
     <header class="top-bar">
