@@ -28,7 +28,15 @@
             box-shadow: 0 20px 60px rgba(0,0,0,0.4);
             text-align: center;
         }
-        .login-logo { font-size:48px; margin-bottom:12px; }
+        .login-logo {
+            margin-bottom: 12px;
+        }
+        .login-logo img {
+            width: 90px;
+            height: 90px;
+            border-radius: 50%;
+            object-fit: cover;
+        }
         .login-title { font-size:22px; font-weight:800; color:#1a3a5c; margin-bottom:4px; }
         .login-subtitle { font-size:14px; color:#7f8c8d; margin-bottom:30px; }
         .login-input {
@@ -61,7 +69,7 @@
 </head>
 <body>
     <div class="login-box">
-        <div class="login-logo">⚓</div>
+        <div class="login-logo"><img src="icons/fbc-logo.jpeg" alt="Freedom Boat Club"></div>
         <div class="login-title">Marine Tech Pro</div>
         <div class="login-subtitle">Authorized Technicians Only</div>
         <input type="password" id="loginPassword" class="login-input" placeholder="Enter access code" autocomplete="off">

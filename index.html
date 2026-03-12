@@ -9,7 +9,6 @@
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-
     <!-- AUTH CHECK -->
     <script>
     (function() {
@@ -24,16 +23,14 @@
         if (!isAuth) window.location.replace('login.html');
     })();
     </script>
-
     <!-- HEADER -->
-<header class="home-header">
-    <img src="icons/fbc-logo.jpeg" alt="Freedom Boat Club" style="width:90px; height:90px; border-radius:50%; margin-bottom:10px;">
-    <h1>Marine Tech Pro</h1>
-    <p>Field Diagnostic &amp; Repair Assistant</p>
-</header>
+    <header class="home-header">
+        <img src="icons/fbc-logo.jpeg" alt="Freedom Boat Club" style="width:90px; height:90px; border-radius:50%; object-fit:cover; margin-bottom:10px;">
+        <h1>Marine Tech Pro</h1>
+        <p>Field Diagnostic &amp; Repair Assistant</p>
+    </header>
     <!-- MAIN CONTENT -->
     <main>
-
         <!-- Status Bar -->
         <div class="status-bar">
             <div class="status-item">
@@ -46,7 +43,6 @@
                 <span class="status-label">4-Stroke 115-300 HP</span>
             </div>
         </div>
-
         <!-- Menu Buttons -->
         <a href="diagnose.html" class="menu-card">
             <div class="menu-icon red">🔍</div>
@@ -56,7 +52,6 @@
             </div>
             <span class="menu-arrow">›</span>
         </a>
-
         <a href="fault-codes.html" class="menu-card">
             <div class="menu-icon orange">⚠️</div>
             <div class="menu-text">
@@ -65,7 +60,6 @@
             </div>
             <span class="menu-arrow">›</span>
         </a>
-
         <a href="specs.html" class="menu-card">
             <div class="menu-icon blue">📘</div>
             <div class="menu-text">
@@ -74,22 +68,18 @@
             </div>
             <span class="menu-arrow">›</span>
         </a>
-
         <!-- Safety Reminder -->
         <div class="safety-banner">
             🛡️ <strong>Safety First:</strong> Kill switch OFF before electrical work.
             PPE required. Fire extinguisher accessible for fuel system work.
         </div>
-
         <!-- Logout Button -->
         <div style="text-align:center; margin-top:30px; padding-bottom:20px;">
             <button onclick="logoutMTP()" style="padding:10px 24px; background:none; border:1px solid #ddd; color:#95a5a6; border-radius:8px; font-size:13px; cursor:pointer;">
                 🔒 Log Out
             </button>
         </div>
-
     </main>
-
     <script>
     function logoutMTP() {
         sessionStorage.removeItem('mtp_auth');
@@ -97,8 +87,5 @@
         window.location.replace('login.html');
     }
     </script>
-
 </body>
-
 </html>
-
