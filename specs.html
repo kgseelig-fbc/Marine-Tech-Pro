@@ -4,9 +4,26 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Engine Specs — Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
+
+    <!-- AUTH CHECK -->
+    <script>
+    (function() {
+        var isAuth = false;
+        try { if (sessionStorage.getItem('mtp_auth') === 'true') isAuth = true; } catch(e) {}
+        if (!isAuth) {
+            try {
+                var r = localStorage.getItem('mtp_auth_expires');
+                if (r && Date.now() < parseInt(r)) { sessionStorage.setItem('mtp_auth', 'true'); isAuth = true; }
+            } catch(e) {}
+        }
+        if (!isAuth) window.location.replace('login.html');
+    })();
+    </script>
 
     <!-- TOP BAR -->
     <header class="top-bar">
@@ -18,61 +35,47 @@
     <h2 class="page-title">Select Engine</h2>
     <p class="page-subtitle">Tap an engine to view full specifications</p>
 
-    <!-- Engine selection buttons -->
     <div class="engine-pick-row" id="engineButtons"></div>
-
-    <!-- Spec display area -->
     <div id="specDisplay"></div>
 
-    <!-- Engine spec data -->
     <script src="js/engineSpecs.js"></script>
 
-    <!-- Display logic -->
     <script>
 
     var activeEngine = null;
 
-    // Build the engine selection buttons when page loads
     window.onload = function() {
         var container = document.getElementById('engineButtons');
-        var html = '';
 
         if (!window.engineSpecDatabase) {
-            container.innerHTML = '<p style="padding:20px; color:red;">Error: engineSpecs.js file not loaded. Make sure it exists in the js folder.</p>';
+            container.innerHTML = '<p style="padding:20px; color:red;">Error: engineSpecs.js not loaded.</p>';
             return;
         }
 
+        var html = '';
         for (var i = 0; i < window.engineSpecDatabase.length; i++) {
             var eng = window.engineSpecDatabase[i];
             html = html + '<button class="engine-pick-btn" id="engBtn_' + i + '" onclick="showEngine(' + i + ')">';
             html = html + eng.name;
             html = html + '</button>';
         }
-
         container.innerHTML = html;
     };
 
-    // Show specs for a selected engine
     function showEngine(index) {
         var eng = window.engineSpecDatabase[index];
         activeEngine = index;
 
-        // Update button styles
         var allBtns = document.querySelectorAll('.engine-pick-btn');
         for (var b = 0; b < allBtns.length; b++) {
             allBtns[b].className = 'engine-pick-btn';
         }
         document.getElementById('engBtn_' + index).className = 'engine-pick-btn active';
 
-        // Build spec card
-        var html = '';
-        html = html + '<div class="spec-card">';
-
-        // Engine name and years
+        var html = '<div class="spec-card">';
         html = html + '<div class="spec-engine-name">' + eng.name + '</div>';
         html = html + '<div class="spec-years">' + eng.years + '</div>';
 
-        // General specs table
         html = html + '<table class="spec-table">';
         html = html + makeRow('Manufacturer', eng.manufacturer);
         html = html + makeRow('Cylinders', eng.cylinders);
@@ -85,7 +88,6 @@
         html = html + makeRow('Diagnostic Tool', eng.diagnosticTool);
         html = html + '</table>';
 
-        // RPM specs
         html = html + '<div class="spec-divider">RPM Specifications</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Idle (Neutral)', eng.idleNeutral);
@@ -93,7 +95,6 @@
         html = html + makeRow('WOT Range', eng.wotRange);
         html = html + '</table>';
 
-        // Spark plugs
         html = html + '<div class="spec-divider">Spark Plugs</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Plug Type', eng.sparkPlug);
@@ -101,14 +102,12 @@
         html = html + makeRow('Torque', eng.sparkTorque);
         html = html + '</table>';
 
-        // Fuel system
         html = html + '<div class="spec-divider">Fuel System</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Fuel Pressure', eng.fuelPressure);
         html = html + makeRow('Injector Resistance', eng.injectorResistance);
         html = html + '</table>';
 
-        // Compression
         html = html + '<div class="spec-divider">Compression</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Normal Range', eng.compressionNormal);
@@ -116,7 +115,6 @@
         html = html + makeRow('Max Variation', eng.compressionVariation);
         html = html + '</table>';
 
-        // Oil
         html = html + '<div class="spec-divider">Lubrication</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Oil Type', eng.oilType);
@@ -125,7 +123,6 @@
         html = html + makeRow('Oil Pressure (WOT)', eng.oilPressureWOT);
         html = html + '</table>';
 
-        // Cooling
         html = html + '<div class="spec-divider">Cooling System</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Thermostat Opens', eng.thermostatOpens);
@@ -133,7 +130,6 @@
         html = html + makeRow('Overheat Alarm', eng.overheatAlarm);
         html = html + '</table>';
 
-        // Charging
         html = html + '<div class="spec-divider">Charging System</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Type', eng.chargingType);
@@ -141,25 +137,21 @@
         html = html + makeRow('Regulated Voltage', eng.chargingVoltage);
         html = html + '</table>';
 
-        // Lower unit
         html = html + '<div class="spec-divider">Lower Unit</div>';
         html = html + '<table class="spec-table">';
         html = html + makeRow('Gear Oil Capacity', eng.gearOilCapacity);
         html = html + makeRow('Gear Oil Type', eng.gearOilType);
         html = html + '</table>';
 
-        // Special notes
         if (eng.notes && eng.notes.length > 0) {
             html = html + '<div class="spec-divider">Special Notes</div>';
             for (var n = 0; n < eng.notes.length; n++) {
-                html = html + '<div style="font-size:14px; padding:6px 0; color:#2c3e50; line-height:1.6;">• ' + eng.notes[n] + '</div>';
+                html = html + '<div style="font-size:14px; padding:6px 0; color:#2c3e50; line-height:1.6;">' + eng.notes[n] + '</div>';
             }
         }
 
-        // Maintenance schedule
         if (eng.maintenance) {
             html = html + '<div class="spec-divider">Maintenance Schedule</div>';
-
             for (var m = 0; m < eng.maintenance.length; m++) {
                 var sched = eng.maintenance[m];
                 html = html + '<div style="font-weight:700; font-size:15px; color:#1a3a5c; margin-top:14px;">' + sched.interval + '</div>';
@@ -169,17 +161,13 @@
             }
         }
 
-        html = html + '</div>'; // close spec-card
-
+        html = html + '</div>';
         document.getElementById('specDisplay').innerHTML = html;
-
-        // Scroll down to show the spec card
         document.getElementById('specDisplay').scrollIntoView({ behavior: 'smooth' });
     }
 
-    // Helper function to make a table row
     function makeRow(label, value) {
-        return '<tr><td>' + label + '</td><td>' + (value || '—') + '</td></tr>';
+        return '<tr><td>' + label + '</td><td>' + (value || '\u2014') + '</td></tr>';
     }
 
     </script>

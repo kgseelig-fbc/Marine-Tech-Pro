@@ -3,52 +3,36 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Diagnose — Marine Tech Pro</title>
+    <title>Diagnosis — Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<body>
 
-    <!-- AUTH CHECK — MUST BE FIRST THING IN BODY -->
+    <!-- AUTH CHECK -->
     <script>
     (function() {
-        // Check session
         var isAuth = false;
-
-        try {
-            if (sessionStorage.getItem('mtp_auth') === 'true') {
-                isAuth = true;
-            }
-        } catch(e) {}
-
-        // Check remember me
+        try { if (sessionStorage.getItem('mtp_auth') === 'true') isAuth = true; } catch(e) {}
         if (!isAuth) {
             try {
-                var remembered = localStorage.getItem('mtp_auth_expires');
-                if (remembered && Date.now() < parseInt(remembered)) {
-                    sessionStorage.setItem('mtp_auth', 'true');
-                    isAuth = true;
-                }
+                var r = localStorage.getItem('mtp_auth_expires');
+                if (r && Date.now() < parseInt(r)) { sessionStorage.setItem('mtp_auth', 'true'); isAuth = true; }
             } catch(e) {}
         }
-
-        // If not authorized, redirect to login
-        if (!isAuth) {
-            window.location.replace('login.html');
-        }
+        if (!isAuth) window.location.replace('login.html');
     })();
     </script>
 
     <!-- TOP BAR -->
     <header class="top-bar">
-        <a href="javascript:void(0)" class="back-link" id="topBackBtn" onclick="handleTopBack()">← Back</a>
-        <h1>Diagnose</h1>
+        <a href="index.html" class="back-link">← Home</a>
+        <h1>Diagnosis</h1>
         <span style="width:60px"></span>
     </header>
 
-    <!-- ==========================================
-         SCREEN 1: SYMPTOM PICKER
-         ========================================== -->
+    <!-- SCREEN 1: SYMPTOM PICKER -->
     <div id="symptomPicker">
 
         <h2 class="page-title">What's the problem?</h2>
@@ -94,19 +78,29 @@
             <span class="menu-arrow">›</span>
         </div>
 
-        <div class="category-header">Steering & Trim</div>
+        <div class="category-header">Steering &amp; Trim</div>
 
         <div class="menu-card" onclick="beginTree('trim_steering')">
             <div class="menu-icon blue">🔄</div>
             <div class="menu-text">
-                <div class="menu-title">Trim & Steering Problems</div>
+                <div class="menu-title">Trim &amp; Steering Problems</div>
                 <div class="menu-subtitle">Trim inop, steering stiff, hydraulic issues</div>
             </div>
             <span class="menu-arrow">›</span>
         </div>
 
         <div class="category-header">Electronics</div>
-<div class="category-header">Accessories</div>
+
+        <div class="menu-card" onclick="beginTree('electronics')">
+            <div class="menu-icon purple">📡</div>
+            <div class="menu-text">
+                <div class="menu-title">Electronics / MFD / Gauges</div>
+                <div class="menu-subtitle">No display, no data, NMEA network problems</div>
+            </div>
+            <span class="menu-arrow">›</span>
+        </div>
+
+        <div class="category-header">Accessories</div>
 
         <div class="menu-card" onclick="beginTree('stereo_audio')">
             <div class="menu-icon purple">🔊</div>
@@ -136,316 +130,196 @@
             </div>
             <span class="menu-arrow">›</span>
         </div>
-        <div class="menu-card" onclick="beginTree('electronics')">
-            <div class="menu-icon purple">📡</div>
-            <div class="menu-text">
-                <div class="menu-title">Electronics / MFD / Gauges</div>
-                <div class="menu-subtitle">No display, no data, NMEA network problems</div>
-            </div>
-            <span class="menu-arrow">›</span>
-        </div>
 
     </div>
 
-
-    <!-- ==========================================
-         SCREEN 2: ACTIVE DIAGNOSIS
-         ========================================== -->
-    <div id="diagScreen" style="display:none;">
-        <div class="diag-wrap">
-
-            <!-- Step navigation -->
-            <div class="step-bar">
-                <button class="step-back-btn" id="backBtn" onclick="goBack()" disabled>← Back</button>
-                <span class="step-number" id="stepNum">Step 1</span>
-                <button class="step-reset-btn" onclick="resetDiag()">Start Over</button>
-            </div>
-
-            <!-- Diagnostic content gets built here by JavaScript -->
-            <div id="diagContent"></div>
-
-        </div>
+    <!-- SCREEN 2: DIAGNOSTIC TREE -->
+    <div id="diagnosticArea" style="display:none;">
+        <div class="diag-breadcrumb" id="breadcrumb"></div>
+        <div id="treeContent"></div>
     </div>
 
-
-    <!-- ==========================================
-         LOAD THE DATA FILE FIRST
-         This must come before the script below
-         ========================================== -->
+    <!-- Load diagnostic tree data -->
     <script src="js/diagnosticTrees.js"></script>
 
-
-    <!-- ==========================================
-         DIAGNOSTIC ENGINE
-         All the logic that makes the diagnostics work
-         ========================================== -->
+    <!-- Diagnostic engine -->
     <script>
 
-    // --- Global variables ---
     var currentTree = null;
-    var currentNode = null;
-    var nodeHistory = [];
+    var currentNodeId = null;
+    var history = [];
 
-    // --- Show coming soon alert ---
-
-    // --- Start a diagnostic tree ---
-    function beginTree(treeId) {
-
-        // Look up the tree in our data file
-        if (!window.defined_trees) {
-            alert('Error: Diagnostic data file not loaded. Make sure diagnosticTrees.js is in your js folder.');
+    function beginTree(treeName) {
+        if (!window.defined_trees || !window.defined_trees[treeName]) {
+            alert('Diagnostic tree not found: ' + treeName);
             return;
         }
 
-        var tree = window.defined_trees[treeId];
+        currentTree = window.defined_trees[treeName];
+        currentNodeId = currentTree.startNode;
+        history = [];
 
-        if (!tree) {
-            alert('This diagnostic tree has not been built yet.');
-            return;
-        }
-
-        // Set up
-        currentTree = tree;
-        nodeHistory = [];
-
-        // Hide the symptom picker, show the diagnostic screen
         document.getElementById('symptomPicker').style.display = 'none';
-        document.getElementById('diagScreen').style.display = 'block';
+        document.getElementById('diagnosticArea').style.display = 'block';
 
-        // Load the first node
-        loadNode(tree.startNode);
+        renderNode();
     }
 
-    // --- Load a specific node and display it ---
-    function loadNode(nodeId) {
-
-        var theNode = currentTree.nodes[nodeId];
-
-        if (!theNode) {
-            alert('Error: Node "' + nodeId + '" not found in this tree.');
-            return;
-        }
-
-        currentNode = theNode;
-
-        // Update step counter
-        document.getElementById('stepNum').textContent = 'Step ' + (nodeHistory.length + 1);
-
-        // Enable/disable back button
-        document.getElementById('backBtn').disabled = (nodeHistory.length === 0);
-
-        // Build the HTML for this node
-        buildNodeHTML(theNode);
-
-        // Scroll to top of page
+    function goToNode(nodeId) {
+        history.push(currentNodeId);
+        currentNodeId = nodeId;
+        renderNode();
         window.scrollTo(0, 0);
     }
 
-    // --- Tech picks an option (moves to next node) ---
-    function pickOption(nextNodeId) {
-        // Save where we are now so we can come back
-        nodeHistory.push(currentNode.id);
-
-        // Go to the next node
-        loadNode(nextNodeId);
-    }
-
-    // --- Go back one step ---
     function goBack() {
-        if (nodeHistory.length > 0) {
-            var previousNodeId = nodeHistory.pop();
-            loadNode(previousNodeId);
-        }
-    }
-
-    // --- Start completely over ---
-    function resetDiag() {
-        if (confirm('Start over? This will reset your current diagnosis.')) {
-            document.getElementById('symptomPicker').style.display = 'block';
-            document.getElementById('diagScreen').style.display = 'none';
-            currentTree = null;
-            currentNode = null;
-            nodeHistory = [];
-        }
-    }
-
-    // --- Handle the top-left Back link ---
-    function handleTopBack() {
-        if (currentTree !== null && nodeHistory.length > 0) {
-            goBack();
-        } else if (currentTree !== null) {
-            resetDiag();
+        if (history.length > 0) {
+            currentNodeId = history.pop();
+            renderNode();
+            window.scrollTo(0, 0);
         } else {
-            window.location.href = 'index.html';
+            startOver();
         }
     }
 
-    // --- Toggle a checklist checkbox ---
-    function toggleCheck(index) {
-        var box = document.getElementById('chk_' + index);
-        var label = document.getElementById('lbl_' + index);
+    function startOver() {
+        currentTree = null;
+        currentNodeId = null;
+        history = [];
+        document.getElementById('symptomPicker').style.display = 'block';
+        document.getElementById('diagnosticArea').style.display = 'none';
+        window.scrollTo(0, 0);
+    }
 
-        if (!box || !label) return;
+    function renderNode() {
+        var node = currentTree.nodes[currentNodeId];
+        if (!node) {
+            document.getElementById('treeContent').innerHTML = '<div class="diag-card"><p>Error: Node "' + currentNodeId + '" not found.</p><button class="diag-back-btn" onclick="startOver()">Start Over</button></div>';
+            return;
+        }
 
-        if (box.className.indexOf('checked') >= 0) {
-            box.className = 'check-box';
-            box.innerHTML = '';
-            label.className = 'check-label';
+        // Breadcrumb
+        var bcHtml = '<span>' + currentTree.title + '</span>';
+        for (var b = 0; b < history.length; b++) {
+            var hNode = currentTree.nodes[history[b]];
+            if (hNode) {
+                var label = hNode.id.replace(/_/g, ' ');
+                if (label.length > 20) label = label.substring(0, 20) + '...';
+                bcHtml = bcHtml + ' <span>' + label + '</span>';
+            }
+        }
+        document.getElementById('breadcrumb').innerHTML = bcHtml;
+
+        // Resolution node
+        if (node.type === 'resolution') {
+            renderResolution(node);
+            return;
+        }
+
+        var html = '<div class="diag-card">';
+
+        // Title
+        if (node.type === 'question') {
+            html = html + '<div class="diag-question">' + node.text + '</div>';
         } else {
-            box.className = 'check-box checked';
-            box.innerHTML = '✓';
-            label.className = 'check-label checked';
-        }
-    }
-
-    // --- Save a measurement reading ---
-    function saveMeasure(label, unit) {
-        var input = document.getElementById('measureInput');
-        if (input && input.value && input.value.length > 0) {
-            alert('Saved: ' + label + ' = ' + input.value + ' ' + unit);
-            input.value = '';
-        } else {
-            alert('Please enter a value first.');
-        }
-    }
-
-
-    // =============================================
-    // BUILD THE HTML FOR A NODE
-    // This is the main rendering function.
-    // It reads the node data and creates all
-    // the visual elements on the screen.
-    // =============================================
-    function buildNodeHTML(node) {
-
-        var container = document.getElementById('diagContent');
-        var html = '';
-        var isResolution = (node.type === 'resolution');
-        var severity = (node.severity || 'low').toLowerCase();
-
-        // ----- SEVERITY BANNER (resolutions only) -----
-        if (isResolution) {
-            var bannerIcon = '✅';
-            if (severity === 'critical') { bannerIcon = '🚨'; }
-            else if (severity === 'high') { bannerIcon = '⚠️'; }
-            else if (severity === 'medium') { bannerIcon = '🔶'; }
-
-            html = html + '<div class="severity-banner ' + severity + '">';
-            html = html + bannerIcon + ' DIAGNOSIS: ' + node.severity.toUpperCase();
-            html = html + '</div>';
+            html = html + '<div class="diag-instruction">' + node.text + '</div>';
         }
 
-        // ----- MAIN CARD -----
-        var cardClass = 'diag-card';
-        if (isResolution) {
-            cardClass = cardClass + ' resolution-' + severity;
-        }
-        html = html + '<div class="' + cardClass + '">';
-
-        // Title (resolutions have a title)
-        if (node.title) {
-            html = html + '<div class="resolution-name">' + node.title + '</div>';
-        }
-
-        // Main text / question / instruction
-        html = html + '<div class="diag-main-text">' + node.text + '</div>';
-
-        // Help tip (blue box)
-        if (node.help) {
-            html = html + '<div class="help-box">';
-            html = html + '💡 <strong>Tip:</strong> ' + node.help;
-            html = html + '</div>';
-        }
-
-        // Warning (red box)
+        // Warning
         if (node.warning) {
-            html = html + '<div class="warning-box">';
-            html = html + node.warning;
+            html = html + '<div class="diag-warning">⚠️ ' + node.warning + '</div>';
+        }
+
+        // Help
+        if (node.help) {
+            html = html + '<div class="diag-help">💡 ' + node.help + '</div>';
+        }
+
+        // Measurement
+        if (node.measurement) {
+            html = html + '<div class="diag-measurement">';
+            html = html + '<div class="diag-measurement-label">Measure: ' + node.measurement.label + '</div>';
+            html = html + '<div class="diag-measurement-expected">Expected: ' + node.measurement.expectedRange + ' ' + node.measurement.unit + '</div>';
             html = html + '</div>';
         }
 
         // Checklist
         if (node.checklist && node.checklist.length > 0) {
-            html = html + '<div class="checklist-title">Check these items:</div>';
-
+            html = html + '<div class="diag-checklist">';
             for (var c = 0; c < node.checklist.length; c++) {
-                html = html + '<div class="checklist-item" onclick="toggleCheck(' + c + ')">';
-                html = html + '  <div class="check-box" id="chk_' + c + '"></div>';
-                html = html + '  <div class="check-label" id="lbl_' + c + '">' + node.checklist[c] + '</div>';
+                html = html + '<div class="diag-checklist-item">';
+                html = html + '<input type="checkbox" class="diag-check">';
+                html = html + '<span>' + node.checklist[c] + '</span>';
                 html = html + '</div>';
             }
-        }
-
-        // Measurement input
-        if (node.measurement) {
-            html = html + '<div class="measure-box">';
-            html = html + '  <div class="measure-label">📏 Record: ' + node.measurement.label + '</div>';
-            html = html + '  <div class="measure-expected">Expected: ' + node.measurement.expectedRange + ' ' + node.measurement.unit + '</div>';
-            html = html + '  <div class="measure-row">';
-            html = html + '    <input type="number" inputmode="decimal" id="measureInput" class="measure-input" placeholder="Enter ' + node.measurement.unit + '">';
-            html = html + '    <button class="measure-save-btn" onclick="saveMeasure(\'' + node.measurement.label + '\', \'' + node.measurement.unit + '\')">Save</button>';
-            html = html + '  </div>';
             html = html + '</div>';
         }
 
-        // Action (resolutions)
-        if (node.action) {
-            html = html + '<div class="action-box">';
-            html = html + '  <div class="action-heading">✅ What to do:</div>';
-            html = html + '  <div class="action-body">' + node.action + '</div>';
-            html = html + '</div>';
-        }
-
-        // Parts needed (resolutions)
-        if (node.partsNeeded && node.partsNeeded.length > 0) {
-            html = html + '<div class="parts-box">';
-            html = html + '  <div class="parts-heading">🔧 Parts Needed:</div>';
-
-            for (var p = 0; p < node.partsNeeded.length; p++) {
-                html = html + '<div class="parts-line">• ' + node.partsNeeded[p] + '</div>';
+        // Options
+        if (node.options && node.options.length > 0) {
+            for (var o = 0; o < node.options.length; o++) {
+                var opt = node.options[o];
+                html = html + '<button class="diag-option-btn" onclick="goToNode(\'' + opt.next + '\')">' + opt.label + '</button>';
             }
-
-            html = html + '</div>';
         }
 
-        // Estimated time
-        if (node.estimatedTime) {
-            html = html + '<div class="time-estimate">⏱ Estimated Time: ' + node.estimatedTime + '</div>';
-        }
-
-        // Close the main card div
+        // Back button
+        html = html + '<button class="diag-back-btn" onclick="goBack()">← Back</button>';
         html = html + '</div>';
 
-
-        // ----- OPTION BUTTONS -----
-        if (node.options && node.options.length > 0) {
-            html = html + '<div class="options-wrap">';
-
-            if (!isResolution) {
-                html = html + '<div class="options-heading">What did you find?</div>';
+        // Tool checklist on first node
+        if (history.length === 0 && currentTree.requiredTools) {
+            html = html + '<div class="tool-checklist">';
+            html = html + '<div class="tool-checklist-title">Tools Needed for This Diagnosis</div>';
+            for (var t = 0; t < currentTree.requiredTools.length; t++) {
+                html = html + '<div class="tool-item">🔧 ' + currentTree.requiredTools[t] + '</div>';
             }
-
-            for (var i = 0; i < node.options.length; i++) {
-                var opt = node.options[i];
-                html = html + '<button class="option-btn" onclick="pickOption(\'' + opt.next + '\')">';
-                html = html + opt.label;
-                html = html + '</button>';
-            }
-
             html = html + '</div>';
         }
 
-        // ----- DONE BUTTON (for resolutions with no further options) -----
-        if (isResolution && (!node.options || node.options.length === 0)) {
-            html = html + '<div style="margin-top:16px;">';
-            html = html + '<button class="option-btn" onclick="resetDiag()" style="background:#1a3a5c; color:white; text-align:center; font-weight:700;">';
-            html = html + '✅ Done — Back to Symptoms';
-            html = html + '</button>';
-            html = html + '</div>';
+        document.getElementById('treeContent').innerHTML = html;
+    }
+
+    function renderResolution(node) {
+        var sevClass = 'severity-' + (node.severity || 'low').toLowerCase();
+        var sevLabel = 'sev-' + (node.severity || 'low').toLowerCase();
+
+        var html = '<div class="resolution-card ' + sevClass + '">';
+        html = html + '<div class="resolution-title">' + (node.title || 'Resolution') + '</div>';
+        html = html + '<span class="resolution-severity ' + sevLabel + '">' + (node.severity || 'INFO') + '</span>';
+        html = html + '<div class="resolution-text">' + node.text + '</div>';
+
+        if (node.warning) {
+            html = html + '<div class="diag-warning">⚠️ ' + node.warning + '</div>';
         }
 
-        // ----- PUT IT ON THE SCREEN -----
-        container.innerHTML = html;
+        if (node.action) {
+            html = html + '<div class="resolution-section-label">Action Required</div>';
+            html = html + '<div class="resolution-action">' + node.action + '</div>';
+        }
+
+        if (node.help) {
+            html = html + '<div class="resolution-section-label">Additional Info</div>';
+            html = html + '<div class="resolution-action">' + node.help + '</div>';
+        }
+
+        if (node.partsNeeded && node.partsNeeded.length > 0) {
+            html = html + '<div class="resolution-section-label">Parts Needed</div>';
+            for (var p = 0; p < node.partsNeeded.length; p++) {
+                html = html + '<div class="resolution-part-item">• ' + node.partsNeeded[p] + '</div>';
+            }
+        }
+
+        if (node.estimatedTime) {
+            html = html + '<div class="resolution-section-label">Estimated Time</div>';
+            html = html + '<div class="resolution-action">' + node.estimatedTime + '</div>';
+        }
+
+        html = html + '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">← Back</button>';
+        html = html + '<button class="resolution-start-over" onclick="startOver()">New Diagnosis</button>';
+        html = html + '</div>';
+
+        document.getElementById('treeContent').innerHTML = html;
     }
 
     </script>

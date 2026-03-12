@@ -4,47 +4,33 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
-<body>
 
-    <!-- AUTH CHECK — MUST BE FIRST THING IN BODY -->
+    <!-- AUTH CHECK -->
     <script>
     (function() {
-        // Check session
         var isAuth = false;
-
-        try {
-            if (sessionStorage.getItem('mtp_auth') === 'true') {
-                isAuth = true;
-            }
-        } catch(e) {}
-
-        // Check remember me
+        try { if (sessionStorage.getItem('mtp_auth') === 'true') isAuth = true; } catch(e) {}
         if (!isAuth) {
             try {
-                var remembered = localStorage.getItem('mtp_auth_expires');
-                if (remembered && Date.now() < parseInt(remembered)) {
-                    sessionStorage.setItem('mtp_auth', 'true');
-                    isAuth = true;
-                }
+                var r = localStorage.getItem('mtp_auth_expires');
+                if (r && Date.now() < parseInt(r)) { sessionStorage.setItem('mtp_auth', 'true'); isAuth = true; }
             } catch(e) {}
         }
-
-        // If not authorized, redirect to login
-        if (!isAuth) {
-            window.location.replace('login.html');
-        }
+        if (!isAuth) window.location.replace('login.html');
     })();
     </script>
 
-    <!-- TOP BAR -->
-    <header class="top-bar">
+    <!-- HEADER -->
+    <header class="home-header">
         <h1>⚓ Marine Tech Pro</h1>
+        <p>Field Diagnostic &amp; Repair Assistant</p>
     </header>
 
-    <!-- MAIN CONTENT -->
     <!-- MAIN CONTENT -->
     <main>
 
@@ -52,7 +38,7 @@
         <div class="status-bar">
             <div class="status-item">
                 <span class="status-icon">🔧</span>
-                <span class="status-label">Mercury & Yamaha</span>
+                <span class="status-label">Mercury &amp; Yamaha</span>
             </div>
             <div class="status-divider"></div>
             <div class="status-item">
@@ -75,7 +61,7 @@
             <div class="menu-icon orange">⚠️</div>
             <div class="menu-text">
                 <div class="menu-title">Fault Code Lookup</div>
-                <div class="menu-subtitle">Mercury SmartCraft & Yamaha DTC codes</div>
+                <div class="menu-subtitle">Mercury SmartCraft &amp; Yamaha DTC codes</div>
             </div>
             <span class="menu-arrow">›</span>
         </a>
@@ -83,7 +69,7 @@
         <a href="specs.html" class="menu-card">
             <div class="menu-icon blue">📘</div>
             <div class="menu-text">
-                <div class="menu-title">Engine Specs & Reference</div>
+                <div class="menu-title">Engine Specs &amp; Reference</div>
                 <div class="menu-subtitle">Pressures, resistances, torque values, maintenance</div>
             </div>
             <span class="menu-arrow">›</span>
@@ -94,315 +80,23 @@
             🛡️ <strong>Safety First:</strong> Kill switch OFF before electrical work.
             PPE required. Fire extinguisher accessible for fuel system work.
         </div>
-<!-- EASTER EGG INPUT -->
-        <div style="margin-top:40px; padding:20px;">
-            <input
-                type="text"
-                id="easterEggInput"
-                placeholder="..."
-                style="width:100%; padding:12px 16px; border:1px solid #ddd; border-radius:8px; font-size:14px; color:#95a5a6; background:#fafafa; outline:none;"
-            >
+
+        <!-- Logout Button -->
+        <div style="text-align:center; margin-top:30px; padding-bottom:20px;">
+            <button onclick="logoutMTP()" style="padding:10px 24px; background:none; border:1px solid #ddd; color:#95a5a6; border-radius:8px; font-size:13px; cursor:pointer;">
+                🔒 Log Out
+            </button>
         </div>
 
-        <!-- EASTER EGG SCREENS (hidden by default) -->
-
-        <!-- SCREEN 1: The Question -->
-        <div id="orcaScreen1" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#0a0a12; z-index:9999; overflow:auto;">
-            <div style="display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; padding:40px 20px;">
-                <div id="orcaQ" style="opacity:0; transition: opacity 2s ease-in; text-align:center;">
-                    <div style="font-size:14px; color:#444; letter-spacing:4px; text-transform:uppercase; margin-bottom:30px;">☠️ CLASSIFIED ☠️</div>
-                    <div style="font-size:28px; color:#c0392b; font-weight:800; line-height:1.3; margin-bottom:40px; text-shadow: 0 0 20px rgba(192,57,43,0.5);">
-                        What is humanity's<br>greatest threat?
-                    </div>
-                    <input
-                        type="text"
-                        id="orcaAnswer"
-                        placeholder="Enter your answer..."
-                        style="width:280px; padding:14px 20px; border:2px solid #333; border-radius:8px; font-size:18px; color:#e74c3c; background:#111; text-align:center; outline:none;"
-                    >
-                    <div id="orcaWrongMsg" style="margin-top:20px; font-size:14px; color:#555; min-height:30px;"></div>
-                    <div style="margin-top:40px;">
-                        <button onclick="closeOrcaEgg()" style="padding:10px 24px; background:none; border:1px solid #333; color:#555; border-radius:6px; font-size:13px; cursor:pointer;">Escape</button>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <!-- SCREEN 2: THE ORCA -->
-        <div id="orcaScreen2" style="display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:#000; z-index:10000; overflow:auto;">
-
-            <!-- Background pulse effect -->
-            <div id="orcaPulse" style="position:absolute; top:50%; left:50%; width:0; height:0; border-radius:50%; background:radial-gradient(circle, rgba(192,57,43,0.3) 0%, transparent 70%); transform:translate(-50%,-50%); z-index:1;"></div>
-
-            <!-- Main content centered -->
-            <div style="position:relative; z-index:2; display:flex; flex-direction:column; align-items:center; padding:60px 20px 100px 20px;">
-
-                <!-- The Orca Creature (CSS Art) -->
-                <div id="orcaCreature" style="opacity:0; transform:scale(0.3); transition: opacity 4s ease-in, transform 4s ease-out;">
-
-                    <!-- SVG Orca-Human Hybrid -->
-                    <svg width="280" height="420" viewBox="0 0 280 420" xmlns="http://www.w3.org/2000/svg">
-
-                        <!-- BODY SHADOW / GLOW -->
-                        <defs>
-                            <radialGradient id="orcaGlow" cx="50%" cy="50%" r="50%">
-                                <stop offset="0%" style="stop-color:#1a1a2e; stop-opacity:0.8"/>
-                                <stop offset="100%" style="stop-color:#000; stop-opacity:0"/>
-                            </radialGradient>
-                            <linearGradient id="orcaSkin" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:#1a1a2e"/>
-                                <stop offset="40%" style="stop-color:#0f0f1a"/>
-                                <stop offset="100%" style="stop-color:#000"/>
-                            </linearGradient>
-                            <linearGradient id="orcaBelly" x1="0%" y1="0%" x2="0%" y2="100%">
-                                <stop offset="0%" style="stop-color:#f5f5f5"/>
-                                <stop offset="100%" style="stop-color:#d0d0d0"/>
-                            </linearGradient>
-                            <filter id="orcaShadow">
-                                <feDropShadow dx="0" dy="0" stdDeviation="8" flood-color="#c0392b" flood-opacity="0.4"/>
-                            </filter>
-                        </defs>
-
-                        <!-- BACKGROUND GLOW -->
-                        <ellipse cx="140" cy="200" rx="140" ry="210" fill="url(#orcaGlow)"/>
-
-                        <!-- LEGS -->
-                        <!-- Left Leg -->
-                        <path d="M105,310 L95,380 L85,410 L95,412 L105,385 L110,310" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-                        <!-- Right Leg -->
-                        <path d="M170,310 L180,380 L190,410 L180,412 L170,385 L165,310" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-                        <!-- Left Knee -->
-                        <ellipse cx="100" cy="360" rx="12" ry="8" fill="#151525"/>
-                        <!-- Right Knee -->
-                        <ellipse cx="178" cy="360" rx="12" ry="8" fill="#151525"/>
-
-                        <!-- Leg Muscles -->
-                        <path d="M100,320 Q95,345 98,370" stroke="#222" stroke-width="2" fill="none"/>
-                        <path d="M112,320 Q117,345 114,370" stroke="#222" stroke-width="2" fill="none"/>
-                        <path d="M165,320 Q160,345 163,370" stroke="#222" stroke-width="2" fill="none"/>
-                        <path d="M177,320 Q182,345 179,370" stroke="#222" stroke-width="2" fill="none"/>
-
-                        <!-- TORSO -->
-                        <path d="M90,150 Q85,180 88,220 Q90,260 95,290 Q100,315 105,320 L170,320 Q175,315 180,290 Q185,260 187,220 Q190,180 185,150 Z" fill="url(#orcaSkin)" stroke="#111" stroke-width="1" filter="url(#orcaShadow)"/>
-
-                        <!-- BELLY (White patch - orca style) -->
-                        <path d="M110,170 Q105,200 108,240 Q110,270 115,300 L160,300 Q165,270 167,240 Q170,200 165,170 Z" fill="url(#orcaBelly)" opacity="0.95"/>
-
-                        <!-- CHEST MUSCLES -->
-                        <path d="M108,165 Q120,175 137,170" stroke="#ccc" stroke-width="1.5" fill="none" opacity="0.5"/>
-                        <path d="M167,165 Q155,175 138,170" stroke="#ccc" stroke-width="1.5" fill="none" opacity="0.5"/>
-                        <!-- Abs -->
-                        <line x1="137" y1="195" x2="137" y2="285" stroke="#bbb" stroke-width="1" opacity="0.4"/>
-                        <path d="M115,210 Q137,215 160,210" stroke="#bbb" stroke-width="1" fill="none" opacity="0.3"/>
-                        <path d="M117,235 Q137,240 158,235" stroke="#bbb" stroke-width="1" fill="none" opacity="0.3"/>
-                        <path d="M118,260 Q137,265 157,260" stroke="#bbb" stroke-width="1" fill="none" opacity="0.3"/>
-
-                        <!-- LEFT ARM (at side, fist clenched) -->
-                        <path d="M90,155 Q65,170 55,200 Q48,225 52,250 Q55,265 60,270" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-                        <!-- Left Bicep -->
-                        <ellipse cx="72" cy="190" rx="18" ry="25" fill="#1a1a2e" stroke="#151525" stroke-width="1"/>
-                        <path d="M62,178 Q72,172 82,178" stroke="#222" stroke-width="2" fill="none"/>
-                        <!-- Left Forearm -->
-                        <path d="M55,220 Q52,240 55,258" stroke="#222" stroke-width="2" fill="none"/>
-                        <!-- Left Fist -->
-                        <ellipse cx="58" cy="268" rx="10" ry="8" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-
-                        <!-- RIGHT ARM (pointing at viewer) -->
-                        <path d="M185,155 Q210,160 230,155 Q245,152 258,150" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-                        <!-- Right Bicep Bulge -->
-                        <ellipse cx="208" cy="150" rx="20" ry="16" fill="#1a1a2e" stroke="#151525" stroke-width="1"/>
-                        <path d="M195,143 Q208,136 220,143" stroke="#222" stroke-width="2" fill="none"/>
-                        <!-- Right Forearm -->
-                        <path d="M225,145 Q240,148 255,147" stroke="#222" stroke-width="2" fill="none"/>
-                        <!-- Pointing Finger -->
-                        <path d="M255,147 L275,145" stroke="#f5f5f5" stroke-width="4" stroke-linecap="round"/>
-                        <path d="M253,150 Q256,155 254,158" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round"/>
-                        <path d="M250,152 Q253,158 251,162" stroke="#1a1a2e" stroke-width="3" stroke-linecap="round"/>
-
-                        <!-- ORCA HEAD -->
-                        <ellipse cx="137" cy="110" rx="52" ry="65" fill="#1a1a2e" stroke="#111" stroke-width="1"/>
-
-                        <!-- Head White Patch (orca eye patches) -->
-                        <ellipse cx="115" cy="95" rx="18" ry="10" fill="#f5f5f5" transform="rotate(-10,115,95)"/>
-                        <ellipse cx="159" cy="95" rx="18" ry="10" fill="#f5f5f5" transform="rotate(10,159,95)"/>
-
-                        <!-- Eyes (menacing, inside white patches) -->
-                        <ellipse cx="115" cy="95" rx="7" ry="6" fill="#000"/>
-                        <circle cx="117" cy="93" r="2" fill="#c0392b"/>
-                        <ellipse cx="159" cy="95" rx="7" ry="6" fill="#000"/>
-                        <circle cx="161" cy="93" r="2" fill="#c0392b"/>
-
-                        <!-- Orca Mouth / Jaw -->
-                        <path d="M105,120 Q120,140 137,142 Q154,140 170,120" fill="#0a0a12" stroke="#111" stroke-width="1"/>
-                        <!-- Teeth -->
-                        <line x1="112" y1="122" x2="114" y2="132" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="121" y1="127" x2="122" y2="137" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="130" y1="130" x2="130" y2="140" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="144" y1="130" x2="144" y2="140" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="153" y1="127" x2="152" y2="137" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-                        <line x1="162" y1="122" x2="160" y2="132" stroke="#fff" stroke-width="2" stroke-linecap="round"/>
-
-                        <!-- Dorsal Fin on top of head -->
-                        <path d="M130,48 Q135,10 145,45 Q140,42 130,48" fill="#0f0f1a" stroke="#111" stroke-width="1"/>
-
-                    </svg>
-
-                </div>
-
-                <!-- "YOU ARE NEXT" word cloud -->
-                <div id="orcaWords" style="opacity:0; transition: opacity 2s ease-in; margin-top:20px; position:relative; width:300px; height:120px;">
-                    <!-- Speech bubble -->
-                    <div style="position:relative; background:rgba(192,57,43,0.15); border:2px solid #c0392b; border-radius:16px; padding:20px; text-align:center;">
-                        <div style="font-size:11px; color:#888; letter-spacing:3px; margin-bottom:8px;">☠️ ☠️ ☠️</div>
-                        <div id="youAreNextText" style="font-size:36px; font-weight:900; color:#c0392b; text-shadow: 0 0 30px rgba(192,57,43,0.8), 0 0 60px rgba(192,57,43,0.4); letter-spacing:4px;">
-                            YOU ARE NEXT
-                        </div>
-                        <div style="font-size:11px; color:#888; letter-spacing:3px; margin-top:8px;">☠️ ☠️ ☠️</div>
-                        <!-- Speech bubble arrow pointing up -->
-                        <div style="position:absolute; top:-12px; left:50%; margin-left:-12px; width:0; height:0; border-left:12px solid transparent; border-right:12px solid transparent; border-bottom:12px solid #c0392b;"></div>
-                    </div>
-                </div>
-
-                <!-- Close button -->
-                <div id="orcaClose" style="opacity:0; transition: opacity 1s ease-in; margin-top:60px; position:relative; z-index:100;">
-                    <button onclick="closeOrcaEgg()" style="padding:16px 40px; background:#1a1a1a; border:2px solid #c0392b; color:#c0392b; border-radius:8px; font-size:16px; font-weight:700; cursor:pointer; letter-spacing:2px; position:relative; z-index:101;">
-                        
-                        ... Start Preparing
-                    </button>
-                </div>
-
-            </div>
-        </div>
     </main>
-<!-- EASTER EGG SCRIPT -->
+
     <script>
-
-    // Listen for the secret word in the hidden input
-    (function() {
-        var eggInput = document.getElementById('easterEggInput');
-        if (!eggInput) return;
-
-        eggInput.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                var val = eggInput.value.trim().toLowerCase();
-                if (val === 'zach') {
-                    eggInput.value = '';
-                    openOrcaScreen1();
-                }
-            }
-        });
-    })();
-
-    // SCREEN 1: The Question
-    function openOrcaScreen1() {
-        var screen = document.getElementById('orcaScreen1');
-        screen.style.display = 'block';
-
-        // Fade in the question after a pause
-        setTimeout(function() {
-            document.getElementById('orcaQ').style.opacity = '1';
-        }, 500);
-
-        // Listen for the answer
-        var answerBox = document.getElementById('orcaAnswer');
-        answerBox.value = '';
-
-        answerBox.addEventListener('keydown', function handler(e) {
-            if (e.key === 'Enter') {
-                var answer = answerBox.value.trim().toLowerCase();
-                var correctAnswers = ['orca', 'orcas', 'killer whale', 'killer whales'];
-
-                if (correctAnswers.indexOf(answer) !== -1) {
-                    answerBox.removeEventListener('keydown', handler);
-                    screen.style.display = 'none';
-                    openOrcaScreen2();
-                } else if (answer.length > 0) {
-                    var wrongMsg = document.getElementById('orcaWrongMsg');
-                    wrongMsg.style.color = '#c0392b';
-                    wrongMsg.textContent = 'You are not yet enlightened...';
-                    answerBox.value = '';
-                    setTimeout(function() {
-                        wrongMsg.textContent = '';
-                    }, 2000);
-                }
-            }
-        });
+    function logoutMTP() {
+        sessionStorage.removeItem('mtp_auth');
+        localStorage.removeItem('mtp_auth_expires');
+        window.location.replace('login.html');
     }
-
-    // SCREEN 2: The Orca Reveal
-    function openOrcaScreen2() {
-        var screen = document.getElementById('orcaScreen2');
-        screen.style.display = 'block';
-
-        // Expand background pulse
-        var pulse = document.getElementById('orcaPulse');
-        setTimeout(function() {
-            pulse.style.transition = 'width 6s ease-out, height 6s ease-out';
-            pulse.style.width = '800px';
-            pulse.style.height = '800px';
-        }, 100);
-
-        // Fade in the creature (slowly)
-        setTimeout(function() {
-            var creature = document.getElementById('orcaCreature');
-            creature.style.opacity = '1';
-            creature.style.transform = 'scale(1)';
-        }, 1000);
-
-        // Fade in the words
-        setTimeout(function() {
-            document.getElementById('orcaWords').style.opacity = '1';
-        }, 4000);
-
-        // Start pulsing the text
-        setTimeout(function() {
-            startTextPulse();
-        }, 5000);
-
-        // Show close button
-        setTimeout(function() {
-            document.getElementById('orcaClose').style.opacity = '1';
-        }, 6000);
-    }
-
-    // Pulse the "YOU ARE NEXT" text
-    function startTextPulse() {
-        var textEl = document.getElementById('youAreNextText');
-        if (!textEl) return;
-
-        var big = false;
-        setInterval(function() {
-            if (big) {
-                textEl.style.transition = 'transform 1s ease-in-out, text-shadow 1s ease-in-out';
-                textEl.style.transform = 'scale(1)';
-                textEl.style.textShadow = '0 0 30px rgba(192,57,43,0.8), 0 0 60px rgba(192,57,43,0.4)';
-            } else {
-                textEl.style.transition = 'transform 1s ease-in-out, text-shadow 1s ease-in-out';
-                textEl.style.transform = 'scale(1.15)';
-                textEl.style.textShadow = '0 0 50px rgba(192,57,43,1), 0 0 100px rgba(192,57,43,0.7), 0 0 150px rgba(192,57,43,0.4)';
-            }
-            big = !big;
-        }, 1200);
-    }
-
-    // Close everything
-    function closeOrcaEgg() {
-        document.getElementById('orcaScreen1').style.display = 'none';
-        document.getElementById('orcaScreen2').style.display = 'none';
-
-        // Reset states for next time
-        document.getElementById('orcaQ').style.opacity = '0';
-        document.getElementById('orcaCreature').style.opacity = '0';
-        document.getElementById('orcaCreature').style.transform = 'scale(0.3)';
-        document.getElementById('orcaWords').style.opacity = '0';
-        document.getElementById('orcaClose').style.opacity = '0';
-
-        var pulse = document.getElementById('orcaPulse');
-        pulse.style.transition = 'none';
-        pulse.style.width = '0';
-        pulse.style.height = '0';
-    }
-
     </script>
+
 </body>
 </html>
