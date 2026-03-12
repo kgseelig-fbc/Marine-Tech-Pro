@@ -7,6 +7,234 @@
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
+    <style>
+        /* Diagnostic option buttons — defined here to guarantee they work */
+        .diag-option-btn {
+            display: block;
+            width: 100%;
+            text-align: left;
+            padding: 14px 16px;
+            margin-bottom: 8px;
+            background: #f8f9fa;
+            border: 2px solid #e0e0e0;
+            border-radius: 10px;
+            font-size: 15px;
+            color: #2c3e50;
+            cursor: pointer;
+            line-height: 1.4;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .diag-option-btn:active {
+            background: #e3f0fc;
+            border-color: #2980b9;
+        }
+
+        .diag-back-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 10px 20px;
+            background: none;
+            border: 1px solid #ddd;
+            border-radius: 8px;
+            font-size: 14px;
+            color: #7f8c8d;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .diag-back-btn:active {
+            background: #f0f0f0;
+        }
+
+        .resolution-start-over {
+            display: inline-block;
+            margin-top: 20px;
+            padding: 12px 24px;
+            background: #1a3a5c;
+            color: #fff;
+            border: none;
+            border-radius: 8px;
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .resolution-start-over:active {
+            background: #0d2137;
+        }
+
+        /* Make sure cards display properly */
+        .diag-card {
+            background: #fff;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eee;
+        }
+
+        .diag-question {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a3a5c;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .diag-instruction {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1a3a5c;
+            margin-bottom: 12px;
+            line-height: 1.4;
+        }
+
+        .diag-help {
+            font-size: 14px;
+            color: #666;
+            background: #f8f9fa;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            line-height: 1.5;
+        }
+
+        .diag-warning {
+            font-size: 14px;
+            color: #c0392b;
+            background: #fde8e8;
+            padding: 10px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-weight: 600;
+            border-left: 4px solid #e74c3c;
+            line-height: 1.5;
+        }
+
+        .diag-measurement {
+            background: #e3f0fc;
+            padding: 12px 14px;
+            border-radius: 8px;
+            margin-bottom: 14px;
+            font-size: 14px;
+        }
+
+        .diag-measurement-label {
+            font-weight: 700;
+            color: #1a3a5c;
+        }
+
+        .diag-measurement-expected {
+            color: #2980b9;
+            font-weight: 600;
+        }
+
+        .diag-checklist {
+            margin-bottom: 14px;
+        }
+
+        .diag-checklist-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 8px 0;
+            font-size: 15px;
+            border-bottom: 1px solid #f0f0f0;
+            line-height: 1.5;
+        }
+
+        .diag-checklist-item:last-child {
+            border-bottom: none;
+        }
+
+        .diag-check {
+            width: 22px;
+            height: 22px;
+            flex-shrink: 0;
+            margin-top: 1px;
+        }
+
+        .diag-breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 12px 16px 0;
+            font-size: 12px;
+            color: #95a5a6;
+        }
+
+        .diag-breadcrumb span {
+            background: #e8ecf0;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .tool-checklist {
+            background: #f8f9fa;
+            padding: 14px 16px;
+            border-radius: 8px;
+            margin: 12px 16px 0;
+        }
+
+        .tool-checklist-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #95a5a6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 8px;
+        }
+
+        .tool-item {
+            font-size: 14px;
+            padding: 3px 0;
+            color: #555;
+        }
+
+        /* Resolution cards */
+        .resolution-card {
+            border-top: 4px solid #27ae60;
+            background: #fff;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .resolution-card.severity-low { border-top-color: #27ae60; }
+        .resolution-card.severity-medium { border-top-color: #f39c12; }
+        .resolution-card.severity-high { border-top-color: #e67e22; }
+        .resolution-card.severity-critical { border-top-color: #e74c3c; }
+
+        .resolution-title { font-size:18px; font-weight:800; color:#1a3a5c; margin-bottom:4px; }
+
+        .resolution-severity {
+            display:inline-block; font-size:12px; font-weight:700;
+            padding:3px 10px; border-radius:20px; margin-bottom:12px;
+        }
+        .resolution-severity.sev-low { background:#e6f4ea; color:#1e7e34; }
+        .resolution-severity.sev-medium { background:#fef3e2; color:#b8860b; }
+        .resolution-severity.sev-high { background:#fde8e8; color:#c0392b; }
+        .resolution-severity.sev-critical { background:#e74c3c; color:#fff; }
+
+        .resolution-text { font-size:15px; color:#2c3e50; margin-bottom:14px; line-height:1.6; }
+
+        .resolution-section-label {
+            font-size:13px; font-weight:700; color:#95a5a6;
+            text-transform:uppercase; letter-spacing:1px; margin-top:14px; margin-bottom:6px;
+        }
+
+        .resolution-action { font-size:15px; color:#2c3e50; line-height:1.6; }
+        .resolution-part-item { font-size:14px; padding:4px 0; color:#2c3e50; }
+    </style>
 </head>
 <body>
 
@@ -147,61 +375,91 @@
 
     var currentTree = null;
     var currentNodeId = null;
-    var history = [];
+    var navHistory = [];
 
+    // =============================================
+    // BEGIN A DIAGNOSTIC TREE
+    // =============================================
     function beginTree(treeName) {
-        if (!window.defined_trees || !window.defined_trees[treeName]) {
-            alert('Diagnostic tree not found: ' + treeName);
+
+        // Check that data loaded
+        if (!window.defined_trees) {
+            alert('Error: Diagnostic data did not load. Try refreshing the page.');
+            return;
+        }
+
+        if (!window.defined_trees[treeName]) {
+            alert('Error: Tree "' + treeName + '" not found.');
             return;
         }
 
         currentTree = window.defined_trees[treeName];
         currentNodeId = currentTree.startNode;
-        history = [];
+        navHistory = [];
 
         document.getElementById('symptomPicker').style.display = 'none';
         document.getElementById('diagnosticArea').style.display = 'block';
 
-        renderNode();
+        renderCurrentNode();
     }
 
+    // =============================================
+    // NAVIGATE TO A NODE
+    // =============================================
     function goToNode(nodeId) {
-        history.push(currentNodeId);
+        navHistory.push(currentNodeId);
         currentNodeId = nodeId;
-        renderNode();
+        renderCurrentNode();
         window.scrollTo(0, 0);
     }
 
+    // =============================================
+    // GO BACK ONE STEP
+    // =============================================
     function goBack() {
-        if (history.length > 0) {
-            currentNodeId = history.pop();
-            renderNode();
+        if (navHistory.length > 0) {
+            currentNodeId = navHistory.pop();
+            renderCurrentNode();
             window.scrollTo(0, 0);
         } else {
             startOver();
         }
     }
 
+    // =============================================
+    // START OVER — BACK TO SYMPTOM LIST
+    // =============================================
     function startOver() {
         currentTree = null;
         currentNodeId = null;
-        history = [];
+        navHistory = [];
         document.getElementById('symptomPicker').style.display = 'block';
         document.getElementById('diagnosticArea').style.display = 'none';
         window.scrollTo(0, 0);
     }
 
-    function renderNode() {
+    // =============================================
+    // RENDER THE CURRENT NODE
+    // =============================================
+    function renderCurrentNode() {
+
         var node = currentTree.nodes[currentNodeId];
+
+        // Error check
         if (!node) {
-            document.getElementById('treeContent').innerHTML = '<div class="diag-card"><p>Error: Node "' + currentNodeId + '" not found.</p><button class="diag-back-btn" onclick="startOver()">Start Over</button></div>';
+            var errHtml = '<div class="diag-card">';
+            errHtml = errHtml + '<p style="color:red;">Error: Node "' + currentNodeId + '" not found in this tree.</p>';
+            errHtml = errHtml + '<button class="diag-back-btn" onclick="goBack()">Go Back</button> ';
+            errHtml = errHtml + '<button class="diag-back-btn" onclick="startOver()">Start Over</button>';
+            errHtml = errHtml + '</div>';
+            document.getElementById('treeContent').innerHTML = errHtml;
             return;
         }
 
-        // Breadcrumb
+        // Build breadcrumb
         var bcHtml = '<span>' + currentTree.title + '</span>';
-        for (var b = 0; b < history.length; b++) {
-            var hNode = currentTree.nodes[history[b]];
+        for (var b = 0; b < navHistory.length; b++) {
+            var hNode = currentTree.nodes[navHistory[b]];
             if (hNode) {
                 var label = hNode.id.replace(/_/g, ' ');
                 if (label.length > 20) label = label.substring(0, 20) + '...';
@@ -210,32 +468,33 @@
         }
         document.getElementById('breadcrumb').innerHTML = bcHtml;
 
-        // Resolution node
+        // Resolution node gets special rendering
         if (node.type === 'resolution') {
             renderResolution(node);
             return;
         }
 
+        // Build the main card
         var html = '<div class="diag-card">';
 
-        // Title
+        // Question or instruction title
         if (node.type === 'question') {
             html = html + '<div class="diag-question">' + node.text + '</div>';
         } else {
             html = html + '<div class="diag-instruction">' + node.text + '</div>';
         }
 
-        // Warning
+        // Warning box
         if (node.warning) {
-            html = html + '<div class="diag-warning">⚠️ ' + node.warning + '</div>';
+            html = html + '<div class="diag-warning">' + node.warning + '</div>';
         }
 
-        // Help
+        // Help box
         if (node.help) {
-            html = html + '<div class="diag-help">💡 ' + node.help + '</div>';
+            html = html + '<div class="diag-help">' + node.help + '</div>';
         }
 
-        // Measurement
+        // Measurement box
         if (node.measurement) {
             html = html + '<div class="diag-measurement">';
             html = html + '<div class="diag-measurement-label">Measure: ' + node.measurement.label + '</div>';
@@ -255,24 +514,31 @@
             html = html + '</div>';
         }
 
-        // Options
+        // Option buttons — using onclick with escaped quotes
         if (node.options && node.options.length > 0) {
+            html = html + '<div style="margin-top:16px;">';
             for (var o = 0; o < node.options.length; o++) {
                 var opt = node.options[o];
-                html = html + '<button class="diag-option-btn" onclick="goToNode(\'' + opt.next + '\')">' + opt.label + '</button>';
+                html = html + '<button class="diag-option-btn" onclick="goToNode(\'' + opt.next + '\')">';
+                html = html + opt.label;
+                html = html + '</button>';
             }
+            html = html + '</div>';
         }
 
         // Back button
-        html = html + '<button class="diag-back-btn" onclick="goBack()">← Back</button>';
+        html = html + '<div style="margin-top:16px;">';
+        html = html + '<button class="diag-back-btn" onclick="goBack()">&#8592; Back</button>';
         html = html + '</div>';
 
-        // Tool checklist on first node
-        if (history.length === 0 && currentTree.requiredTools) {
+        html = html + '</div>'; // close diag-card
+
+        // Tool checklist on the first node only
+        if (navHistory.length === 0 && currentTree.requiredTools) {
             html = html + '<div class="tool-checklist">';
             html = html + '<div class="tool-checklist-title">Tools Needed for This Diagnosis</div>';
             for (var t = 0; t < currentTree.requiredTools.length; t++) {
-                html = html + '<div class="tool-item">🔧 ' + currentTree.requiredTools[t] + '</div>';
+                html = html + '<div class="tool-item">&#128295; ' + currentTree.requiredTools[t] + '</div>';
             }
             html = html + '</div>';
         }
@@ -280,44 +546,61 @@
         document.getElementById('treeContent').innerHTML = html;
     }
 
+    // =============================================
+    // RENDER A RESOLUTION NODE
+    // =============================================
     function renderResolution(node) {
+
         var sevClass = 'severity-' + (node.severity || 'low').toLowerCase();
         var sevLabel = 'sev-' + (node.severity || 'low').toLowerCase();
 
         var html = '<div class="resolution-card ' + sevClass + '">';
+
+        // Title and severity badge
         html = html + '<div class="resolution-title">' + (node.title || 'Resolution') + '</div>';
         html = html + '<span class="resolution-severity ' + sevLabel + '">' + (node.severity || 'INFO') + '</span>';
+
+        // Main text
         html = html + '<div class="resolution-text">' + node.text + '</div>';
 
+        // Warning
         if (node.warning) {
-            html = html + '<div class="diag-warning">⚠️ ' + node.warning + '</div>';
+            html = html + '<div class="diag-warning">' + node.warning + '</div>';
         }
 
+        // Action
         if (node.action) {
             html = html + '<div class="resolution-section-label">Action Required</div>';
             html = html + '<div class="resolution-action">' + node.action + '</div>';
         }
 
+        // Help
         if (node.help) {
             html = html + '<div class="resolution-section-label">Additional Info</div>';
             html = html + '<div class="resolution-action">' + node.help + '</div>';
         }
 
+        // Parts needed
         if (node.partsNeeded && node.partsNeeded.length > 0) {
             html = html + '<div class="resolution-section-label">Parts Needed</div>';
             for (var p = 0; p < node.partsNeeded.length; p++) {
-                html = html + '<div class="resolution-part-item">• ' + node.partsNeeded[p] + '</div>';
+                html = html + '<div class="resolution-part-item">&#8226; ' + node.partsNeeded[p] + '</div>';
             }
         }
 
+        // Estimated time
         if (node.estimatedTime) {
             html = html + '<div class="resolution-section-label">Estimated Time</div>';
             html = html + '<div class="resolution-action">' + node.estimatedTime + '</div>';
         }
 
-        html = html + '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">← Back</button>';
+        // Buttons
+        html = html + '<div style="margin-top:20px;">';
+        html = html + '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">&#8592; Back</button>';
         html = html + '<button class="resolution-start-over" onclick="startOver()">New Diagnosis</button>';
         html = html + '</div>';
+
+        html = html + '</div>'; // close resolution-card
 
         document.getElementById('treeContent').innerHTML = html;
     }
