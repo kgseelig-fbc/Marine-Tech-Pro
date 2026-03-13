@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Engine Specs — Marine Tech Pro</title>
+    <title>Fault Codes — Marine Tech Pro</title>
     <link rel="manifest" href="manifest.json">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <link rel="stylesheet" href="css/styles.css">
@@ -16,154 +16,924 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+
+        .search-container {
+            margin: 0 16px 16px;
+            position: relative;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 14px 18px 14px 44px;
+            border: 2px solid #ddd;
+            border-radius: 12px;
+            font-size: 16px;
+            outline: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+        }
+
+        .search-input:focus {
+            border-color: #1a3a5c;
+        }
+
+        .search-icon {
+            position: absolute;
+            left: 16px;
+            top: 50%;
+            transform: translateY(-50%);
+            font-size: 18px;
+            color: #95a5a6;
+        }
+
+        .search-clear {
+            position: absolute;
+            right: 14px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: #ddd;
+            border: none;
+            border-radius: 50%;
+            width: 24px;
+            height: 24px;
+            font-size: 14px;
+            color: #666;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            line-height: 1;
+        }
+
+        .filter-row {
+            display: flex;
+            gap: 8px;
+            margin: 0 16px 16px;
+            flex-wrap: wrap;
+        }
+
+        .filter-btn {
+            padding: 8px 16px;
+            border: 1px solid #ddd;
+            border-radius: 20px;
+            background: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            color: #666;
+            cursor: pointer;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .filter-btn.active {
+            background: #1a3a5c;
+            color: #fff;
+            border-color: #1a3a5c;
+        }
+
+        .results-count {
+            margin: 0 16px 12px;
+            font-size: 13px;
+            color: #95a5a6;
+            font-weight: 600;
+        }
+
+        .fault-card {
+            background: #fff;
+            margin: 0 16px 12px;
+            padding: 16px;
+            border-radius: 12px;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            border: 1px solid #eee;
+            cursor: pointer;
+            transition: border-color 0.2s;
+        }
+
+        .fault-card:active {
+            border-color: #2980b9;
+        }
+
+        .fault-card.expanded {
+            border-color: #1a3a5c;
+        }
+
+        .fault-header {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .fault-code-badge {
+            background: #1a3a5c;
+            color: #fff;
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 14px;
+            font-weight: 800;
+            font-family: 'SF Mono', 'Consolas', monospace;
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+
+        .fault-code-badge.mercury { background: #1a3a5c; }
+        .fault-code-badge.yamaha { background: #c0392b; }
+
+        .fault-summary {
+            flex: 1;
+        }
+
+        .fault-title {
+            font-size: 15px;
+            font-weight: 700;
+            color: #2c3e50;
+            line-height: 1.3;
+        }
+
+        .fault-brand {
+            font-size: 12px;
+            color: #95a5a6;
+            margin-top: 2px;
+        }
+
+        .fault-expand-icon {
+            font-size: 18px;
+            color: #ccc;
+            flex-shrink: 0;
+            transition: transform 0.2s;
+        }
+
+        .fault-card.expanded .fault-expand-icon {
+            transform: rotate(90deg);
+        }
+
+        .fault-details {
+            display: none;
+            margin-top: 14px;
+            padding-top: 14px;
+            border-top: 1px solid #eee;
+        }
+
+        .fault-card.expanded .fault-details {
+            display: block;
+        }
+
+        .detail-section {
+            margin-bottom: 12px;
+        }
+
+        .detail-label {
+            font-size: 12px;
+            font-weight: 700;
+            color: #1a3a5c;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+
+        .detail-text {
+            font-size: 14px;
+            color: #2c3e50;
+            line-height: 1.6;
+        }
+
+        .severity-badge {
+            display: inline-block;
+            font-size: 11px;
+            font-weight: 700;
+            padding: 3px 10px;
+            border-radius: 12px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .severity-badge.low { background: #e6f4ea; color: #1e7e34; }
+        .severity-badge.medium { background: #fef3e2; color: #b8860b; }
+        .severity-badge.high { background: #fde8e8; color: #c0392b; }
+        .severity-badge.critical { background: #e74c3c; color: #fff; }
+
+        .cause-list, .fix-list {
+            margin: 0;
+            padding: 0 0 0 16px;
+            font-size: 14px;
+            color: #2c3e50;
+            line-height: 1.8;
+        }
+
+        .no-results {
+            text-align: center;
+            padding: 40px 20px;
+            color: #95a5a6;
+        }
+
+        .no-results-icon {
+            font-size: 48px;
+            margin-bottom: 12px;
+        }
+
+        .no-results-text {
+            font-size: 16px;
+            font-weight: 600;
+        }
+
+        .no-results-hint {
+            font-size: 14px;
+            margin-top: 8px;
+        }
+
+        .severity-filter-row {
+            display: flex;
+            gap: 6px;
+            margin: 0 16px 16px;
+            flex-wrap: wrap;
+        }
+
+        .sev-filter {
+            padding: 6px 12px;
+            border: 1px solid #ddd;
+            border-radius: 16px;
+            background: #fff;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .sev-filter.active { border-color: #1a3a5c; background: #e3f0fc; color: #1a3a5c; }
     </style>
 </head>
 <body>
 
     <!-- TOP BAR -->
     <header class="top-bar">
-        <a href="index.html" class="back-link">← Home</a>
-        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Engine Specs</h1>
+        <a href="index.html" class="back-link">&#8592; Home</a>
+        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Fault Codes</h1>
         <span style="width:60px"></span>
     </header>
 
-    <h2 class="page-title">Select Engine</h2>
-    <p class="page-subtitle">Tap an engine to view full specifications</p>
+    <h2 class="page-title">Fault Code Lookup</h2>
+    <p class="page-subtitle">Search Mercury SmartCraft &amp; Yamaha DTC codes</p>
 
-    <div class="engine-pick-row" id="engineButtons"></div>
-    <div id="specDisplay"></div>
+    <!-- SEARCH -->
+    <div class="search-container">
+        <span class="search-icon">&#128269;</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search code, keyword, or symptom..." autocomplete="off">
+        <button class="search-clear" id="searchClear" onclick="clearSearch()">&#10005;</button>
+    </div>
 
-    <script src="js/engineSpecs.js"></script>
+    <!-- BRAND FILTER -->
+    <div class="filter-row">
+        <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">All Codes</button>
+        <button class="filter-btn" id="filterMercury" onclick="setFilter('mercury')">Mercury</button>
+        <button class="filter-btn" id="filterYamaha" onclick="setFilter('yamaha')">Yamaha</button>
+    </div>
+
+    <!-- SEVERITY FILTER -->
+    <div class="severity-filter-row">
+        <button class="sev-filter active" onclick="setSeverity('all')">All Severity</button>
+        <button class="sev-filter" onclick="setSeverity('critical')">&#128308; Critical</button>
+        <button class="sev-filter" onclick="setSeverity('high')">&#128992; High</button>
+        <button class="sev-filter" onclick="setSeverity('medium')">&#128993; Medium</button>
+        <button class="sev-filter" onclick="setSeverity('low')">&#128994; Low</button>
+    </div>
+
+    <div class="results-count" id="resultsCount"></div>
+
+    <!-- RESULTS -->
+    <div id="faultResults"></div>
+
+    <div style="text-align:center; padding:20px; margin-bottom:20px;">
+        <a href="index.html" style="color:#95a5a6; font-size:13px; text-decoration:none;">&#8592; Back to Home</a>
+    </div>
 
     <script>
 
-    var activeEngine = null;
+    // =============================================
+    // FAULT CODE DATABASE
+    // =============================================
+    var faultCodes = [
 
-    window.onload = function() {
-        var container = document.getElementById('engineButtons');
+        // ===============================
+        // MERCURY SMARTCRAFT CODES
+        // ===============================
 
-        if (!window.engineSpecDatabase) {
-            container.innerHTML = '<p style="padding:20px; color:red;">Error: engineSpecs.js not loaded.</p>';
+        {
+            code: 'P0100',
+            brand: 'mercury',
+            title: 'MAP Sensor Circuit Malfunction',
+            severity: 'medium',
+            description: 'Manifold Absolute Pressure sensor is reading outside expected range. Engine may run rough or have poor throttle response.',
+            causes: [
+                'Damaged or corroded MAP sensor connector',
+                'Cracked or disconnected vacuum hose',
+                'Failed MAP sensor',
+                'Water intrusion in connector'
+            ],
+            fixes: [
+                'Inspect MAP sensor connector for corrosion — clean with electrical cleaner',
+                'Check vacuum hose for cracks or disconnection',
+                'Measure sensor output voltage (should be ~1V at idle, ~4.5V at WOT)',
+                'Replace MAP sensor if readings are out of range'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0110',
+            brand: 'mercury',
+            title: 'Intake Air Temperature Sensor Malfunction',
+            severity: 'low',
+            description: 'IAT sensor is reporting an out-of-range temperature. May cause slightly rich or lean fuel mixture.',
+            causes: [
+                'Corroded IAT sensor connector',
+                'Failed IAT sensor',
+                'Open or short in wiring harness'
+            ],
+            fixes: [
+                'Inspect connector for corrosion or water intrusion',
+                'Measure resistance: ~2.5kΩ at 68°F (20°C)',
+                'Replace sensor if resistance is out of spec'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0115',
+            brand: 'mercury',
+            title: 'Engine Coolant Temperature Sensor Malfunction',
+            severity: 'high',
+            description: 'ECT sensor is not providing a valid signal. Engine may not enter closed-loop fuel control. Overheat protection may be compromised.',
+            causes: [
+                'Failed ECT sensor',
+                'Corroded connector or pins',
+                'Open or shorted wiring',
+                'Incorrect sensor installed'
+            ],
+            fixes: [
+                'Check connector for corrosion and secure fit',
+                'Measure resistance: ~10kΩ at 32°F, ~1kΩ at 140°F',
+                'Verify continuity of wiring to ECM',
+                'Replace sensor if out of spec'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0116',
+            brand: 'mercury',
+            title: 'Engine Coolant Temperature Range/Performance',
+            severity: 'high',
+            description: 'Engine is not reaching normal operating temperature or is overheating. Thermostat may be stuck open or closed.',
+            causes: [
+                'Thermostat stuck open (engine stays cool) or closed (overheats)',
+                'Low coolant flow — blocked water passages',
+                'Failed water pump impeller',
+                'ECT sensor reading incorrectly'
+            ],
+            fixes: [
+                'Verify tell-tale water flow at idle',
+                'Check thermostat — should open at 140–160°F',
+                'Inspect water pump impeller for wear or damage',
+                'Flush cooling passages if restricted',
+                'Replace ECT sensor if readings don\'t match infrared thermometer'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0120',
+            brand: 'mercury',
+            title: 'Throttle Position Sensor Circuit Malfunction',
+            severity: 'high',
+            description: 'TPS is reporting erratic or out-of-range values. May cause surging, poor throttle response, or limp mode.',
+            causes: [
+                'Worn or failed TPS',
+                'Corroded connector',
+                'Damaged wiring harness',
+                'Throttle body contamination'
+            ],
+            fixes: [
+                'Check TPS voltage: ~0.5V closed, ~4.5V WOT — should sweep smoothly',
+                'Clean throttle body with approved cleaner',
+                'Inspect wiring for chafing or breaks',
+                'Replace TPS if signal is erratic or dead spots found'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0130',
+            brand: 'mercury',
+            title: 'Oxygen Sensor Circuit Malfunction (Bank 1)',
+            severity: 'medium',
+            description: 'O2 sensor is not switching properly. Engine may run rich, have poor fuel economy, or fail to enter closed-loop.',
+            causes: [
+                'Failed O2 sensor',
+                'Exhaust leak before sensor',
+                'Contaminated sensor (oil, fuel, water)',
+                'Wiring damage'
+            ],
+            fixes: [
+                'Check sensor voltage: should oscillate between 0.1V and 0.9V at operating temp',
+                'Inspect exhaust for leaks upstream of sensor',
+                'Verify wiring continuity and connector condition',
+                'Replace O2 sensor — use OEM Mercury part'
+            ],
+            models: 'Mercury 4-Stroke EFI (150–300 HP, V6/V8)'
+        },
+        {
+            code: 'P0170',
+            brand: 'mercury',
+            title: 'Fuel Trim Malfunction',
+            severity: 'medium',
+            description: 'ECM has detected fuel trim values outside normal range. Engine is compensating excessively for a rich or lean condition.',
+            causes: [
+                'Vacuum leak (cracked hose, loose intake)',
+                'Dirty or clogged fuel injectors',
+                'Failing fuel pump (low pressure)',
+                'Contaminated fuel',
+                'Exhaust leak'
+            ],
+            fixes: [
+                'Check fuel pressure: Mercury spec typically 35–45 PSI',
+                'Spray carburetor cleaner around intake to check for vacuum leaks (RPM change = leak)',
+                'Run injector cleaner or perform ultrasonic cleaning',
+                'Check fuel quality and filter condition',
+                'Inspect exhaust for leaks'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0300',
+            brand: 'mercury',
+            title: 'Random/Multiple Cylinder Misfire Detected',
+            severity: 'high',
+            description: 'ECM has detected misfires across multiple cylinders. Engine will run rough and may lose significant power.',
+            causes: [
+                'Fouled or worn spark plugs',
+                'Failed ignition coil(s)',
+                'Low fuel pressure',
+                'Compression issue across multiple cylinders',
+                'Water in fuel',
+                'Vacuum leak'
+            ],
+            fixes: [
+                'Pull and inspect all spark plugs — check gap and condition',
+                'Test ignition coils with multimeter (primary: 0.3–1.0Ω, secondary: 5k–15kΩ)',
+                'Check fuel pressure with gauge',
+                'Perform compression test — all cylinders within 10% of each other',
+                'Drain fuel separator and check for water'
+            ],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0301',
+            brand: 'mercury',
+            title: 'Cylinder 1 Misfire Detected',
+            severity: 'medium',
+            description: 'Persistent misfire on cylinder 1. Causes vibration and power loss.',
+            causes: ['Fouled or damaged spark plug on cyl 1', 'Failed ignition coil on cyl 1', 'Faulty fuel injector on cyl 1', 'Low compression on cyl 1'],
+            fixes: ['Swap cyl 1 coil with known good cylinder — if misfire follows, coil is bad', 'Replace spark plug on cyl 1', 'Test injector resistance (typically 12–16Ω)', 'Compression test cyl 1 if plug and coil are good'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0302',
+            brand: 'mercury',
+            title: 'Cylinder 2 Misfire Detected',
+            severity: 'medium',
+            description: 'Persistent misfire on cylinder 2.',
+            causes: ['Fouled spark plug', 'Failed ignition coil', 'Faulty injector', 'Low compression'],
+            fixes: ['Swap coil to isolate', 'Replace spark plug', 'Test injector resistance', 'Compression test if needed'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0303',
+            brand: 'mercury',
+            title: 'Cylinder 3 Misfire Detected',
+            severity: 'medium',
+            description: 'Persistent misfire on cylinder 3.',
+            causes: ['Fouled spark plug', 'Failed ignition coil', 'Faulty injector', 'Low compression'],
+            fixes: ['Swap coil to isolate', 'Replace spark plug', 'Test injector resistance', 'Compression test if needed'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0304',
+            brand: 'mercury',
+            title: 'Cylinder 4 Misfire Detected',
+            severity: 'medium',
+            description: 'Persistent misfire on cylinder 4.',
+            causes: ['Fouled spark plug', 'Failed ignition coil', 'Faulty injector', 'Low compression'],
+            fixes: ['Swap coil to isolate', 'Replace spark plug', 'Test injector resistance', 'Compression test if needed'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0325',
+            brand: 'mercury',
+            title: 'Knock Sensor Circuit Malfunction',
+            severity: 'medium',
+            description: 'Knock sensor signal is missing or erratic. ECM may retard timing as a precaution, reducing performance.',
+            causes: ['Failed knock sensor', 'Loose sensor mounting bolt (torque-sensitive)', 'Damaged wiring', 'Excessive engine vibration from other issue'],
+            fixes: ['Check knock sensor mounting — must be torqued to spec', 'Inspect wiring and connector', 'Replace knock sensor if wiring is good', 'Address any underlying vibration issues'],
+            models: 'Mercury 4-Stroke EFI (150–300 HP)'
+        },
+        {
+            code: 'P0520',
+            brand: 'mercury',
+            title: 'Oil Pressure Sensor Circuit',
+            severity: 'high',
+            description: 'Oil pressure sensor is not providing a valid signal. Cannot verify oil pressure. Treat as potential low oil until verified.',
+            causes: ['Failed oil pressure sensor', 'Damaged wiring to sensor', 'Corroded connector', 'Low oil level'],
+            fixes: ['CHECK OIL LEVEL FIRST', 'Inspect sensor connector for damage/corrosion', 'Verify with mechanical oil pressure gauge', 'Replace sensor if wiring and oil level are good'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0560',
+            brand: 'mercury',
+            title: 'System Voltage Malfunction',
+            severity: 'medium',
+            description: 'ECM has detected system voltage outside 9–16V range. May indicate charging system failure or battery issues.',
+            causes: ['Failed stator/rectifier-regulator', 'Bad battery or loose battery connections', 'Corroded ground connections', 'Excessive electrical load'],
+            fixes: ['Check battery voltage: 12.4–12.8V at rest, 13.5–14.5V running', 'Inspect battery terminals and ground connections — clean and tighten', 'Test stator output (AC voltage between stator leads, engine running)', 'Test rectifier-regulator output', 'Load test battery'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0600',
+            brand: 'mercury',
+            title: 'Serial Communication Link Malfunction',
+            severity: 'high',
+            description: 'ECM has lost communication on the data bus. Gauges may be blank or erratic. Multiple systems affected.',
+            causes: ['Corroded CAN bus connectors', 'Damaged data harness', 'Failed SmartCraft module', 'Water intrusion in main harness junction'],
+            fixes: ['Inspect all CAN bus / SmartCraft data connectors for corrosion', 'Check harness for chafing, especially where it passes through bulkhead', 'Verify 120Ω termination resistance on CAN bus', 'Disconnect components one at a time to isolate the fault'],
+            models: 'Mercury SmartCraft / CAN bus equipped engines'
+        },
+        {
+            code: 'P0650',
+            brand: 'mercury',
+            title: 'Check Engine / MIL Circuit',
+            severity: 'low',
+            description: 'ECM is unable to control the Malfunction Indicator Light. May have other underlying codes.',
+            causes: ['Burned out MIL bulb or LED', 'Open circuit in MIL wiring', 'ECM driver fault'],
+            fixes: ['Check MIL bulb/LED', 'Verify wiring continuity from ECM to gauge', 'Scan for additional DTCs — this often accompanies other codes'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'P0705',
+            brand: 'mercury',
+            title: 'Transmission Range Sensor Circuit',
+            severity: 'high',
+            description: 'Neutral/gear position sensor is not reporting correctly. Engine may not start or may have shift issues.',
+            causes: ['Failed neutral safety switch', 'Corroded shift connector', 'Misadjusted shift cable', 'Damaged wiring'],
+            fixes: ['Check shift cable adjustment', 'Inspect neutral safety switch connector', 'Verify switch operation with multimeter in each gear position', 'Replace switch if readings are incorrect'],
+            models: 'Mercury 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: 'OT',
+            brand: 'mercury',
+            title: 'Overheat Warning — SmartCraft',
+            severity: 'critical',
+            description: 'SmartCraft gauge displays OT. Engine has exceeded safe operating temperature. Guardian mode may activate, reducing RPM.',
+            causes: ['Loss of water flow — debris in intake, failed impeller', 'Thermostat stuck closed', 'Blocked or collapsed tell-tale hose', 'Head gasket leak', 'Operating in shallow water / mud'],
+            fixes: ['STOP ENGINE IMMEDIATELY and check tell-tale', 'Clear any debris from water intake', 'Inspect impeller — replace if vanes are worn, cracked, or missing pieces', 'Check thermostat operation', 'If overheated severely, check for head gasket damage (milky oil, exhaust steam)'],
+            models: 'All Mercury SmartCraft equipped engines'
+        },
+        {
+            code: 'OP',
+            brand: 'mercury',
+            title: 'Low Oil Pressure Warning — SmartCraft',
+            severity: 'critical',
+            description: 'SmartCraft gauge displays OP. Oil pressure has dropped below safe level. STOP ENGINE to prevent catastrophic damage.',
+            causes: ['Low oil level', 'Oil pump failure', 'Clogged oil pickup screen', 'Worn bearings (high-hour engine)', 'Wrong viscosity oil', 'Failed oil pressure sensor (verify mechanically)'],
+            fixes: ['STOP ENGINE IMMEDIATELY', 'Check oil level and add if low', 'If oil level is fine, do NOT restart — tow to service', 'Verify with mechanical gauge before assuming sensor failure', 'If confirmed low pressure, inspect oil pump, pickup screen, and bearings'],
+            models: 'All Mercury SmartCraft equipped engines'
+        },
+        {
+            code: 'LV',
+            brand: 'mercury',
+            title: 'Low Voltage Warning — SmartCraft',
+            severity: 'medium',
+            description: 'SmartCraft gauge displays LV. System voltage has dropped below threshold.',
+            causes: ['Weak or dead battery', 'Failed alternator/stator', 'Corroded battery connections', 'Parasitic draw draining battery', 'Too many accessories on undersized battery'],
+            fixes: ['Check battery voltage immediately', 'Clean and tighten all battery connections', 'Test charging output at battery with engine running at 2000 RPM', 'Load test battery — replace if weak', 'Check for parasitic draw if battery drains overnight'],
+            models: 'All Mercury SmartCraft equipped engines'
+        },
+        {
+            code: 'SE',
+            brand: 'mercury',
+            title: 'Steering Fault — SmartCraft',
+            severity: 'high',
+            description: 'SmartCraft has detected a steering system fault. May affect electronic steering or DTS systems.',
+            causes: ['Steering position sensor failure', 'Hydraulic steering leak', 'Wiring issue in steering harness', 'ECM communication error'],
+            fixes: ['Check steering fluid level (hydraulic systems)', 'Inspect steering harness connections', 'Check for DTC codes on SmartCraft gauge', 'Scan with Mercury diagnostic tool for specific sub-codes'],
+            models: 'Mercury with electronic steering / DTS'
+        },
+
+        // ===============================
+        // YAMAHA DTC CODES
+        // ===============================
+
+        {
+            code: '1',
+            brand: 'yamaha',
+            title: 'Intake Air Pressure Sensor Error',
+            severity: 'medium',
+            description: 'Intake air pressure sensor is reading out of range. Engine may run poorly or go into limp mode.',
+            causes: ['Failed pressure sensor', 'Cracked or disconnected vacuum hose', 'Water intrusion in sensor connector', 'Blocked air intake'],
+            fixes: ['Inspect vacuum hose connection to sensor', 'Check connector for corrosion', 'Measure sensor output voltage per Yamaha spec', 'Replace sensor if out of range'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '2',
+            brand: 'yamaha',
+            title: 'Intake Air Temperature Sensor Error',
+            severity: 'low',
+            description: 'IAT sensor is reading outside expected range. Fuel mixture may be slightly off.',
+            causes: ['Failed IAT sensor', 'Connector corrosion', 'Open or short in wiring'],
+            fixes: ['Check connector condition', 'Measure resistance: ~2.5kΩ at 68°F', 'Replace if out of spec'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '3',
+            brand: 'yamaha',
+            title: 'Throttle Position Sensor Error',
+            severity: 'high',
+            description: 'TPS signal is erratic or out of range. Engine may enter limp mode with limited RPM.',
+            causes: ['Worn or failed TPS', 'Corroded connector pins', 'Throttle body contamination', 'Wiring damage'],
+            fixes: ['Check TPS voltage sweep: smooth transition from idle to WOT', 'Clean throttle body', 'Inspect wiring for damage', 'Replace TPS if signal is erratic'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '4',
+            brand: 'yamaha',
+            title: 'Atmospheric Pressure Sensor Error',
+            severity: 'low',
+            description: 'Barometric pressure sensor is reading incorrectly. Minor impact on fuel trim.',
+            causes: ['Failed sensor (usually integrated in ECM)', 'ECM issue'],
+            fixes: ['Compare reading with known barometric pressure', 'If sensor is ECM-integrated, may require ECM replacement', 'Check for water intrusion in ECM area'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '6',
+            brand: 'yamaha',
+            title: 'Engine Coolant Temperature Sensor Error',
+            severity: 'high',
+            description: 'ECT sensor signal is invalid. Overheat protection may not function correctly.',
+            causes: ['Failed ECT sensor', 'Corroded connector', 'Open/short in wiring', 'Wrong sensor installed'],
+            fixes: ['Inspect connector — clean corrosion', 'Measure resistance: compare to Yamaha temp/resistance chart', 'Verify wiring continuity to ECM', 'Replace sensor if out of spec'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '7',
+            brand: 'yamaha',
+            title: 'Trim Sender Error',
+            severity: 'low',
+            description: 'Trim position sensor is not reporting correctly. Trim gauge may read wrong but trim function still works.',
+            causes: ['Failed trim sender unit', 'Corroded connector', 'Damaged wiring'],
+            fixes: ['Check trim sender connector', 'Measure sender resistance through full trim range (should change smoothly)', 'Replace sender if resistance is erratic'],
+            models: 'Yamaha 4-Stroke (115–300 HP)'
+        },
+        {
+            code: '12',
+            brand: 'yamaha',
+            title: 'Crankshaft Position Sensor Error',
+            severity: 'critical',
+            description: 'CKP sensor is not providing a valid signal. Engine will not start or will stall immediately. No spark without this signal.',
+            causes: ['Failed CKP sensor', 'Excessive gap between sensor and flywheel', 'Damaged flywheel teeth/trigger ring', 'Wiring damage or connector corrosion'],
+            fixes: ['Check sensor air gap — verify per Yamaha spec', 'Inspect connector and wiring for damage', 'Measure sensor resistance per Yamaha spec', 'Inspect flywheel trigger ring for damage', 'Replace CKP sensor if out of spec'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '14',
+            brand: 'yamaha',
+            title: 'Ignition Coil Error',
+            severity: 'high',
+            description: 'One or more ignition coils have failed. Engine will misfire and run rough.',
+            causes: ['Failed ignition coil', 'Damaged coil connector', 'Coil driver failure in ECM', 'Spark plug fouling causing coil stress'],
+            fixes: ['Measure coil primary resistance: 0.2–0.6Ω (typical)', 'Measure coil secondary resistance: 6k–15kΩ (typical)', 'Swap coils between cylinders to confirm failed unit', 'Check spark plugs — fouled plugs can kill coils', 'Replace failed coil with OEM Yamaha part'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '15',
+            brand: 'yamaha',
+            title: 'Fuel Injector Error',
+            severity: 'high',
+            description: 'ECM has detected a fuel injector circuit fault. Affected cylinder will not receive fuel.',
+            causes: ['Failed fuel injector (open or shorted)', 'Damaged injector connector', 'Injector driver failure in ECM', 'Clogged injector'],
+            fixes: ['Measure injector resistance: typically 12–16Ω', 'Check connector and wiring', 'Use scan tool to identify which injector', 'Try injector cleaner or ultrasonic cleaning', 'Replace injector if electrically failed'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '17',
+            brand: 'yamaha',
+            title: 'Knock Sensor Error',
+            severity: 'medium',
+            description: 'Knock sensor signal is missing. ECM may retard timing as a safety measure.',
+            causes: ['Failed knock sensor', 'Loose mounting bolt', 'Wiring damage', 'Connector corrosion'],
+            fixes: ['Check sensor mounting torque', 'Inspect wiring and connector', 'Replace sensor if confirmed bad'],
+            models: 'Yamaha 4-Stroke EFI (150–300 HP)'
+        },
+        {
+            code: '19',
+            brand: 'yamaha',
+            title: 'ECM / CPU Error',
+            severity: 'critical',
+            description: 'Internal ECM fault detected. Engine behavior may be unpredictable.',
+            causes: ['ECM internal failure', 'Power supply issue to ECM', 'Water intrusion in ECM', 'Voltage spike damage'],
+            fixes: ['Check ECM power and ground connections', 'Inspect ECM for signs of water intrusion or corrosion', 'Verify battery voltage is stable (12.4–14.5V range)', 'ECM replacement may be required — must be programmed by Yamaha dealer'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '21',
+            brand: 'yamaha',
+            title: 'Water In Fuel Sensor Alert',
+            severity: 'high',
+            description: 'Water has been detected in the fuel system. Running with water in fuel can cause serious engine damage.',
+            causes: ['Condensation in fuel tank', 'Contaminated fuel from marina', 'Failed fuel tank vent allowing rain intrusion', 'Worn fuel cap seal'],
+            fixes: ['STOP ENGINE if running rough', 'Drain fuel/water separator immediately', 'If severe, drain fuel tank completely', 'Replace fuel filter', 'Add fuel stabilizer/water remover to fresh fuel', 'Check fuel cap seal and tank vent'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '22',
+            brand: 'yamaha',
+            title: 'Oil Pressure Sensor Error',
+            severity: 'high',
+            description: 'Oil pressure sensor is not providing a valid signal. Cannot verify adequate lubrication.',
+            causes: ['Failed oil pressure sensor', 'Wiring damage', 'Low oil level'],
+            fixes: ['CHECK OIL LEVEL FIRST', 'Inspect sensor connector', 'Verify with mechanical gauge if possible', 'Replace sensor if wiring and oil are good'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '24',
+            brand: 'yamaha',
+            title: 'Shift Position Sensor Error',
+            severity: 'medium',
+            description: 'Gear position sensor is reporting incorrectly. May affect starting (neutral safety) or shift indicators.',
+            causes: ['Failed shift position switch', 'Misadjusted shift linkage', 'Corroded connector', 'Damaged wiring'],
+            fixes: ['Check shift cable adjustment', 'Inspect switch connector for corrosion', 'Verify switch continuity in each position', 'Replace switch if faulty'],
+            models: 'Yamaha 4-Stroke (115–300 HP)'
+        },
+        {
+            code: '26',
+            brand: 'yamaha',
+            title: 'Engine Speed (Overspeed) Error',
+            severity: 'critical',
+            description: 'Engine RPM exceeded safe maximum. Rev limiter has activated. Possible propeller issue.',
+            causes: ['Propeller ventilation (cavitation)', 'Wrong propeller pitch — too low', 'Running in aerated water (sharp turns, following sea)', 'Damaged or missing propeller'],
+            fixes: ['Inspect propeller for damage', 'Verify correct propeller pitch — WOT should be within rated RPM range', 'Check for prop ventilation at trim angles', 'If persistent, may need higher-pitch prop'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '28',
+            brand: 'yamaha',
+            title: 'Overheat Warning',
+            severity: 'critical',
+            description: 'Engine temperature has exceeded safe limit. Engine will enter protective RPM reduction mode.',
+            causes: ['Blocked water intake (debris, plastic bag)', 'Failed water pump impeller', 'Thermostat stuck closed', 'Low water level (shallow operation)', 'Damaged tell-tale hose'],
+            fixes: ['REDUCE THROTTLE OR STOP ENGINE', 'Check tell-tale for water flow', 'Clear any debris from water intake', 'Inspect impeller — replace if worn or damaged', 'Check thermostat operation', 'Allow engine to cool before restarting'],
+            models: 'Yamaha 4-Stroke (115–300 HP)'
+        },
+        {
+            code: '41',
+            brand: 'yamaha',
+            title: 'Charging System Error',
+            severity: 'medium',
+            description: 'Battery is not charging properly. Voltage is below or above expected range while running.',
+            causes: ['Failed stator', 'Failed rectifier-regulator', 'Bad battery', 'Corroded connections', 'Broken charge wire'],
+            fixes: ['Check battery voltage: 13.5–14.5V at 2000+ RPM', 'Test stator AC output between stator leads (engine running)', 'Test rectifier-regulator with multimeter', 'Inspect all battery and ground connections', 'Load test battery'],
+            models: 'Yamaha 4-Stroke (115–300 HP)'
+        },
+        {
+            code: '42',
+            brand: 'yamaha',
+            title: 'Sensor Power Supply Error',
+            severity: 'high',
+            description: 'The 5V reference voltage from the ECM to sensors is out of range. Multiple sensors may report errors simultaneously.',
+            causes: ['Short to ground in a sensor circuit', 'Failed sensor pulling down the 5V rail', 'ECM 5V regulator failure', 'Wiring short'],
+            fixes: ['Check 5V reference at sensor connectors with multimeter', 'Disconnect sensors one at a time to find the one pulling the voltage down', 'Inspect all sensor wiring for shorts to ground', 'If 5V is still bad with all sensors disconnected, ECM may need replacement'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        },
+        {
+            code: '44',
+            brand: 'yamaha',
+            title: 'EEPROM Error',
+            severity: 'high',
+            description: 'ECM EEPROM memory has a read/write error. Stored parameters may be corrupted.',
+            causes: ['ECM internal failure', 'Voltage spike or drop during write operation', 'Water intrusion', 'Age/wear of ECM'],
+            fixes: ['Clear code and monitor — may be a one-time event', 'Check ECM power supply is clean and stable', 'Inspect ECM for water damage', 'If code returns, ECM replacement required (Yamaha dealer programming needed)'],
+            models: 'Yamaha 4-Stroke EFI (115–300 HP)'
+        }
+    ];
+
+    // =============================================
+    // SEARCH & FILTER ENGINE
+    // =============================================
+
+    var currentFilter = 'all';
+    var currentSeverity = 'all';
+
+    document.getElementById('searchInput').addEventListener('input', renderResults);
+
+    function clearSearch() {
+        document.getElementById('searchInput').value = '';
+        document.getElementById('searchClear').style.display = 'none';
+        renderResults();
+    }
+
+    function setFilter(brand) {
+        currentFilter = brand;
+        document.querySelectorAll('.filter-btn').forEach(function(btn) { btn.className = 'filter-btn'; });
+        document.getElementById('filter' + brand.charAt(0).toUpperCase() + brand.slice(1)).className = 'filter-btn active';
+        renderResults();
+    }
+
+    function setSeverity(sev) {
+        currentSeverity = sev;
+        document.querySelectorAll('.sev-filter').forEach(function(btn) { btn.className = 'sev-filter'; });
+        event.target.className = 'sev-filter active';
+        renderResults();
+    }
+
+    function toggleCard(id) {
+        var card = document.getElementById(id);
+        card.classList.toggle('expanded');
+    }
+
+    function renderResults() {
+        var query = document.getElementById('searchInput').value.trim().toLowerCase();
+        var clearBtn = document.getElementById('searchClear');
+        clearBtn.style.display = query ? 'flex' : 'none';
+
+        var filtered = faultCodes.filter(function(fc) {
+            if (currentFilter !== 'all' && fc.brand !== currentFilter) return false;
+            if (currentSeverity !== 'all' && fc.severity !== currentSeverity) return false;
+            if (!query) return true;
+            var searchable = (fc.code + ' ' + fc.title + ' ' + fc.description + ' ' + fc.causes.join(' ') + ' ' + fc.fixes.join(' ')).toLowerCase();
+            return searchable.indexOf(query) !== -1;
+        });
+
+        var countEl = document.getElementById('resultsCount');
+        countEl.textContent = filtered.length + ' code' + (filtered.length !== 1 ? 's' : '') + ' found';
+
+        if (filtered.length === 0) {
+            document.getElementById('faultResults').innerHTML =
+                '<div class="no-results">' +
+                '<div class="no-results-icon">&#128269;</div>' +
+                '<div class="no-results-text">No codes found</div>' +
+                '<div class="no-results-hint">Try a different search term or adjust filters</div>' +
+                '</div>';
             return;
         }
 
+        var sevOrder = { critical: 0, high: 1, medium: 2, low: 3 };
+        filtered.sort(function(a, b) {
+            return (sevOrder[a.severity] || 9) - (sevOrder[b.severity] || 9);
+        });
+
         var html = '';
-        for (var i = 0; i < window.engineSpecDatabase.length; i++) {
-            var eng = window.engineSpecDatabase[i];
-            html = html + '<button class="engine-pick-btn" id="engBtn_' + i + '" onclick="showEngine(' + i + ')">';
-            html = html + eng.name;
-            html = html + '</button>';
-        }
-        container.innerHTML = html;
-    };
+        for (var i = 0; i < filtered.length; i++) {
+            var fc = filtered[i];
+            var cardId = 'fc_' + i;
 
-    function showEngine(index) {
-        var eng = window.engineSpecDatabase[index];
-        activeEngine = index;
+            html += '<div class="fault-card" id="' + cardId + '" onclick="toggleCard(\'' + cardId + '\')">';
+            html += '<div class="fault-header">';
+            html += '<span class="fault-code-badge ' + fc.brand + '">' + fc.code + '</span>';
+            html += '<div class="fault-summary">';
+            html += '<div class="fault-title">' + fc.title + '</div>';
+            html += '<div class="fault-brand">' + (fc.brand === 'mercury' ? 'Mercury SmartCraft' : 'Yamaha') + '</div>';
+            html += '</div>';
+            html += '<span class="fault-expand-icon">&#8250;</span>';
+            html += '</div>';
 
-        var allBtns = document.querySelectorAll('.engine-pick-btn');
-        for (var b = 0; b < allBtns.length; b++) {
-            allBtns[b].className = 'engine-pick-btn';
-        }
-        document.getElementById('engBtn_' + index).className = 'engine-pick-btn active';
+            html += '<div class="fault-details">';
 
-        var html = '<div class="spec-card">';
-        html = html + '<div class="spec-engine-name">' + eng.name + '</div>';
-        html = html + '<div class="spec-years">' + eng.years + '</div>';
+            html += '<div class="detail-section">';
+            html += '<span class="severity-badge ' + fc.severity + '">' + fc.severity + '</span>';
+            html += '<div class="detail-text" style="margin-top:8px;">' + fc.description + '</div>';
+            html += '</div>';
 
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Manufacturer', eng.manufacturer);
-        html = html + makeRow('Cylinders', eng.cylinders);
-        html = html + makeRow('Displacement', eng.displacement);
-        html = html + makeRow('Fuel System', eng.fuelSystem);
-        html = html + makeRow('Ignition', eng.ignition);
-        html = html + makeRow('Firing Order', eng.firingOrder);
-        html = html + makeRow('Gear Ratio', eng.gearRatio);
-        html = html + makeRow('Control System', eng.controlSystem);
-        html = html + makeRow('Diagnostic Tool', eng.diagnosticTool);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">RPM Specifications</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Idle (Neutral)', eng.idleNeutral);
-        html = html + makeRow('Idle (In Gear)', eng.idleInGear);
-        html = html + makeRow('WOT Range', eng.wotRange);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Spark Plugs</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Plug Type', eng.sparkPlug);
-        html = html + makeRow('Gap', eng.sparkGap);
-        html = html + makeRow('Torque', eng.sparkTorque);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Fuel System</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Fuel Pressure', eng.fuelPressure);
-        html = html + makeRow('Injector Resistance', eng.injectorResistance);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Compression</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Normal Range', eng.compressionNormal);
-        html = html + makeRow('Minimum', eng.compressionMin);
-        html = html + makeRow('Max Variation', eng.compressionVariation);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Lubrication</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Oil Type', eng.oilType);
-        html = html + makeRow('Oil Capacity', eng.oilCapacity);
-        html = html + makeRow('Oil Pressure (Idle)', eng.oilPressureIdle);
-        html = html + makeRow('Oil Pressure (WOT)', eng.oilPressureWOT);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Cooling System</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Thermostat Opens', eng.thermostatOpens);
-        html = html + makeRow('Normal Operating Temp', eng.normalTemp);
-        html = html + makeRow('Overheat Alarm', eng.overheatAlarm);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Charging System</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Type', eng.chargingType);
-        html = html + makeRow('Output', eng.chargingOutput);
-        html = html + makeRow('Regulated Voltage', eng.chargingVoltage);
-        html = html + '</table>';
-
-        html = html + '<div class="spec-divider">Lower Unit</div>';
-        html = html + '<table class="spec-table">';
-        html = html + makeRow('Gear Oil Capacity', eng.gearOilCapacity);
-        html = html + makeRow('Gear Oil Type', eng.gearOilType);
-        html = html + '</table>';
-
-        if (eng.notes && eng.notes.length > 0) {
-            html = html + '<div class="spec-divider">Special Notes</div>';
-            for (var n = 0; n < eng.notes.length; n++) {
-                html = html + '<div style="font-size:14px; padding:6px 0; color:#2c3e50; line-height:1.6;">' + eng.notes[n] + '</div>';
+            if (fc.models) {
+                html += '<div class="detail-section">';
+                html += '<div class="detail-label">Applies To</div>';
+                html += '<div class="detail-text">' + fc.models + '</div>';
+                html += '</div>';
             }
-        }
 
-        if (eng.maintenance) {
-            html = html + '<div class="spec-divider">Maintenance Schedule</div>';
-            for (var m = 0; m < eng.maintenance.length; m++) {
-                var sched = eng.maintenance[m];
-                html = html + '<div style="font-weight:700; font-size:15px; color:#1a3a5c; margin-top:14px;">' + sched.interval + '</div>';
-                for (var t = 0; t < sched.tasks.length; t++) {
-                    html = html + '<div style="font-size:14px; padding:3px 0 3px 12px; color:#2c3e50;">&#9744; ' + sched.tasks[t] + '</div>';
-                }
+            html += '<div class="detail-section">';
+            html += '<div class="detail-label">Common Causes</div>';
+            html += '<ul class="cause-list">';
+            for (var c = 0; c < fc.causes.length; c++) {
+                html += '<li>' + fc.causes[c] + '</li>';
             }
+            html += '</ul></div>';
+
+            html += '<div class="detail-section">';
+            html += '<div class="detail-label">Diagnostic Steps &amp; Fixes</div>';
+            html += '<ol class="fix-list">';
+            for (var f = 0; f < fc.fixes.length; f++) {
+                html += '<li>' + fc.fixes[f] + '</li>';
+            }
+            html += '</ol></div>';
+
+            html += '</div>';
+            html += '</div>';
         }
 
-        html = html + '</div>';
-        document.getElementById('specDisplay').innerHTML = html;
-        document.getElementById('specDisplay').scrollIntoView({ behavior: 'smooth' });
+        document.getElementById('faultResults').innerHTML = html;
     }
 
-    function makeRow(label, value) {
-        return '<tr><td>' + label + '</td><td>' + (value || '\u2014') + '</td></tr>';
-    }
+    renderResults();
 
     </script>
 
