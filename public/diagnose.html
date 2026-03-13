@@ -1,0 +1,547 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnosis — Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .top-bar-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+
+        .diag-option-btn {
+            display: flex;
+            align-items: center;
+            width: 100%;
+            text-align: left;
+            padding: 16px;
+            margin-bottom: 8px;
+            background: #fff;
+            border: 1px solid #eee;
+            border-radius: 12px;
+            font-size: 15px;
+            color: #2c3e50;
+            cursor: pointer;
+            line-height: 1.4;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.06);
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            position: relative;
+        }
+
+        .diag-option-btn:active {
+            background: #e3f0fc;
+            border-color: #2980b9;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+        }
+
+        .diag-option-btn::after {
+            content: '\203A';
+            font-size: 22px;
+            color: #ccc;
+            margin-left: auto;
+            padding-left: 12px;
+            flex-shrink: 0;
+        }
+
+        .diag-back-btn {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 12px 24px;
+            background: #f8f9fa;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            font-size: 14px;
+            font-weight: 600;
+            color: #7f8c8d;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+
+        .diag-back-btn:active { background: #eee; }
+
+        .resolution-start-over {
+            display: inline-block;
+            margin-top: 12px;
+            padding: 14px 28px;
+            background: linear-gradient(135deg, #1a3a5c 0%, #0d2137 100%);
+            color: #fff;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            letter-spacing: 0.5px;
+        }
+
+        .resolution-start-over:active { background: #0d2137; }
+
+        .diag-card {
+            background: #fff;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+            border: 1px solid #eee;
+        }
+
+        .diag-question {
+            font-size: 18px;
+            font-weight: 700;
+            color: #1a3a5c;
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+
+        .diag-instruction {
+            font-size: 17px;
+            font-weight: 700;
+            color: #1a3a5c;
+            margin-bottom: 16px;
+            line-height: 1.4;
+        }
+
+        .diag-help {
+            font-size: 14px;
+            color: #555;
+            background: #f0f7ff;
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            line-height: 1.6;
+            border-left: 4px solid #2980b9;
+        }
+
+        .diag-warning {
+            font-size: 14px;
+            color: #c0392b;
+            background: #fde8e8;
+            padding: 12px 14px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-weight: 600;
+            border-left: 4px solid #e74c3c;
+            line-height: 1.6;
+        }
+
+        .diag-measurement {
+            background: #e3f0fc;
+            padding: 14px;
+            border-radius: 10px;
+            margin-bottom: 16px;
+            font-size: 14px;
+            border-left: 4px solid #2980b9;
+        }
+
+        .diag-measurement-label { font-weight: 700; color: #1a3a5c; margin-bottom: 4px; }
+        .diag-measurement-expected { color: #2980b9; font-weight: 600; }
+
+        .diag-checklist {
+            margin-bottom: 16px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 4px 14px;
+        }
+
+        .diag-checklist-item {
+            display: flex;
+            align-items: flex-start;
+            gap: 10px;
+            padding: 10px 0;
+            font-size: 15px;
+            border-bottom: 1px solid #eee;
+            line-height: 1.5;
+        }
+
+        .diag-checklist-item:last-child { border-bottom: none; }
+
+        .diag-check {
+            width: 22px;
+            height: 22px;
+            flex-shrink: 0;
+            margin-top: 1px;
+            accent-color: #27ae60;
+        }
+
+        .diag-breadcrumb {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 4px;
+            margin: 12px 16px 0;
+            font-size: 12px;
+            color: #95a5a6;
+        }
+
+        .diag-breadcrumb span {
+            background: #e8ecf0;
+            padding: 3px 8px;
+            border-radius: 4px;
+        }
+
+        .tool-checklist {
+            background: #fff;
+            padding: 16px;
+            border-radius: 12px;
+            margin: 12px 16px;
+            border: 1px solid #eee;
+            box-shadow: 0 2px 6px rgba(0,0,0,0.04);
+        }
+
+        .tool-checklist-title {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1a3a5c;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 10px;
+        }
+
+        .tool-item {
+            font-size: 14px;
+            padding: 5px 0;
+            color: #555;
+            border-bottom: 1px solid #f5f5f5;
+        }
+
+        .tool-item:last-child { border-bottom: none; }
+
+        .resolution-card {
+            border-top: 4px solid #27ae60;
+            background: #fff;
+            margin: 16px;
+            padding: 20px;
+            border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+        }
+
+        .resolution-card.severity-low { border-top-color: #27ae60; }
+        .resolution-card.severity-medium { border-top-color: #f39c12; }
+        .resolution-card.severity-high { border-top-color: #e67e22; }
+        .resolution-card.severity-critical { border-top-color: #e74c3c; }
+
+        .resolution-title { font-size: 18px; font-weight: 800; color: #1a3a5c; margin-bottom: 4px; }
+
+        .resolution-severity {
+            display: inline-block;
+            font-size: 12px;
+            font-weight: 700;
+            padding: 4px 12px;
+            border-radius: 20px;
+            margin-bottom: 14px;
+        }
+
+        .resolution-severity.sev-low { background: #e6f4ea; color: #1e7e34; }
+        .resolution-severity.sev-medium { background: #fef3e2; color: #b8860b; }
+        .resolution-severity.sev-high { background: #fde8e8; color: #c0392b; }
+        .resolution-severity.sev-critical { background: #e74c3c; color: #fff; }
+
+        .resolution-text { font-size: 15px; color: #2c3e50; margin-bottom: 14px; line-height: 1.6; }
+
+        .resolution-section-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #1a3a5c;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 16px;
+            margin-bottom: 6px;
+            padding-bottom: 4px;
+            border-bottom: 1px solid #eee;
+        }
+
+        .resolution-action { font-size: 15px; color: #2c3e50; line-height: 1.6; }
+        .resolution-part-item { font-size: 14px; padding: 4px 0; color: #2c3e50; }
+
+        .options-label {
+            font-size: 13px;
+            font-weight: 700;
+            color: #95a5a6;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-top: 20px;
+            margin-bottom: 10px;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <a href="index.html" class="back-link">&#8592; Home</a>
+        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Diagnosis</h1>
+        <span style="width:60px"></span>
+    </header>
+
+    <div id="symptomPicker">
+
+        <h2 class="page-title">What's the problem?</h2>
+        <p class="page-subtitle">Select the symptom to start guided diagnosis</p>
+
+        <div class="category-header">Engine</div>
+
+        <div class="menu-card" onclick="beginTree('engine_no_start')">
+            <div class="menu-icon red">&#128683;</div>
+            <div class="menu-text">
+                <div class="menu-title">Engine Won't Start</div>
+                <div class="menu-subtitle">No crank, cranks but won't fire, slow crank</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="menu-card" onclick="beginTree('engine_overheat')">
+            <div class="menu-icon orange">&#127777;&#65039;</div>
+            <div class="menu-text">
+                <div class="menu-title">Overheating</div>
+                <div class="menu-subtitle">Overheat alarm, high temp, no tell-tale</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="menu-card" onclick="beginTree('engine_runs_rough')">
+            <div class="menu-icon orange">&#128243;</div>
+            <div class="menu-text">
+                <div class="menu-title">Runs Rough / Misfires</div>
+                <div class="menu-subtitle">Vibration, stumble, poor performance</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="category-header">Electrical</div>
+
+        <div class="menu-card" onclick="beginTree('charging_electrical')">
+            <div class="menu-icon orange">&#128267;</div>
+            <div class="menu-text">
+                <div class="menu-title">Charging / Battery Issues</div>
+                <div class="menu-subtitle">Dead battery, not charging, low voltage</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="category-header">Steering &amp; Trim</div>
+
+        <div class="menu-card" onclick="beginTree('trim_steering')">
+            <div class="menu-icon blue">&#128260;</div>
+            <div class="menu-text">
+                <div class="menu-title">Trim &amp; Steering Problems</div>
+                <div class="menu-subtitle">Trim inop, steering stiff, hydraulic issues</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="category-header">Electronics</div>
+
+        <div class="menu-card" onclick="beginTree('electronics')">
+            <div class="menu-icon purple">&#128225;</div>
+            <div class="menu-text">
+                <div class="menu-title">Electronics / MFD / Gauges</div>
+                <div class="menu-subtitle">No display, no data, NMEA network problems</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="category-header">Accessories</div>
+
+        <div class="menu-card" onclick="beginTree('stereo_audio')">
+            <div class="menu-icon purple">&#128266;</div>
+            <div class="menu-text">
+                <div class="menu-title">Stereo / Audio System</div>
+                <div class="menu-subtitle">No sound, distortion, Bluetooth, amp problems</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="category-header">Safety Equipment</div>
+
+        <div class="menu-card" onclick="beginTree('nav_lights')">
+            <div class="menu-icon green">&#128161;</div>
+            <div class="menu-text">
+                <div class="menu-title">Navigation Lights</div>
+                <div class="menu-subtitle">Lights out, dim, flickering</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+        <div class="menu-card" onclick="beginTree('horn_system')">
+            <div class="menu-icon green">&#128226;</div>
+            <div class="menu-text">
+                <div class="menu-title">Horn Not Working</div>
+                <div class="menu-subtitle">Dead horn, weak, stuck on</div>
+            </div>
+            <span class="menu-arrow">&#8250;</span>
+        </div>
+
+    </div>
+
+    <div id="diagnosticArea" style="display:none;">
+        <div class="diag-breadcrumb" id="breadcrumb"></div>
+        <div id="treeContent"></div>
+    </div>
+
+    <script src="js/diagnosticTrees.js"></script>
+
+    <script>
+
+    var currentTree = null;
+    var currentNodeId = null;
+    var navHistory = [];
+
+    function beginTree(treeName) {
+        if (!window.defined_trees) {
+            alert('Error: Diagnostic data did not load. Try refreshing the page.');
+            return;
+        }
+        if (!window.defined_trees[treeName]) {
+            alert('Error: Tree "' + treeName + '" not found in the data.');
+            return;
+        }
+        currentTree = window.defined_trees[treeName];
+        currentNodeId = currentTree.startNode;
+        navHistory = [];
+        document.getElementById('symptomPicker').style.display = 'none';
+        document.getElementById('diagnosticArea').style.display = 'block';
+        renderCurrentNode();
+    }
+
+    function goToNode(nodeId) {
+        navHistory.push(currentNodeId);
+        currentNodeId = nodeId;
+        renderCurrentNode();
+        window.scrollTo(0, 0);
+    }
+
+    function goBack() {
+        if (navHistory.length > 0) {
+            currentNodeId = navHistory.pop();
+            renderCurrentNode();
+            window.scrollTo(0, 0);
+        } else {
+            startOver();
+        }
+    }
+
+    function startOver() {
+        currentTree = null;
+        currentNodeId = null;
+        navHistory = [];
+        document.getElementById('symptomPicker').style.display = 'block';
+        document.getElementById('diagnosticArea').style.display = 'none';
+        window.scrollTo(0, 0);
+    }
+
+    function renderCurrentNode() {
+        var node = currentTree.nodes[currentNodeId];
+        if (!node) {
+            var errHtml = '<div class="diag-card">';
+            errHtml += '<div class="diag-warning">Error: Node "' + currentNodeId + '" not found.</div>';
+            errHtml += '<button class="diag-back-btn" onclick="goBack()">&#8592; Go Back</button> ';
+            errHtml += '<button class="diag-back-btn" onclick="startOver()">Start Over</button>';
+            errHtml += '</div>';
+            document.getElementById('treeContent').innerHTML = errHtml;
+            return;
+        }
+
+        var bcHtml = '<span>' + currentTree.title + '</span>';
+        for (var b = 0; b < navHistory.length; b++) {
+            var hNode = currentTree.nodes[navHistory[b]];
+            if (hNode) {
+                var bLabel = hNode.id.replace(/_/g, ' ');
+                if (bLabel.length > 20) bLabel = bLabel.substring(0, 20) + '...';
+                bcHtml += ' <span>' + bLabel + '</span>';
+            }
+        }
+        document.getElementById('breadcrumb').innerHTML = bcHtml;
+
+        if (node.type === 'resolution') { renderResolution(node); return; }
+
+        var html = '<div class="diag-card">';
+        if (node.type === 'question') {
+            html += '<div class="diag-question">' + node.text + '</div>';
+        } else {
+            html += '<div class="diag-instruction">' + node.text + '</div>';
+        }
+        if (node.warning) html += '<div class="diag-warning">' + node.warning + '</div>';
+        if (node.help) html += '<div class="diag-help">' + node.help + '</div>';
+        if (node.measurement) {
+            html += '<div class="diag-measurement">';
+            html += '<div class="diag-measurement-label">Measure: ' + node.measurement.label + '</div>';
+            html += '<div class="diag-measurement-expected">Expected: ' + node.measurement.expectedRange + ' ' + node.measurement.unit + '</div>';
+            html += '</div>';
+        }
+        if (node.checklist && node.checklist.length > 0) {
+            html += '<div class="diag-checklist">';
+            for (var c = 0; c < node.checklist.length; c++) {
+                html += '<div class="diag-checklist-item"><input type="checkbox" class="diag-check"><span>' + node.checklist[c] + '</span></div>';
+            }
+            html += '</div>';
+        }
+        if (node.options && node.options.length > 0) {
+            html += '<div class="options-label">What did you find?</div>';
+            for (var o = 0; o < node.options.length; o++) {
+                var opt = node.options[o];
+                html += '<button class="diag-option-btn" onclick="goToNode(\'' + opt.next + '\')"><span>' + opt.label + '</span></button>';
+            }
+        }
+        html += '<div style="margin-top:16px;"><button class="diag-back-btn" onclick="goBack()">&#8592; Back</button></div>';
+        html += '</div>';
+
+        if (navHistory.length === 0 && currentTree.requiredTools) {
+            html += '<div class="tool-checklist"><div class="tool-checklist-title">Tools Needed for This Diagnosis</div>';
+            for (var t = 0; t < currentTree.requiredTools.length; t++) {
+                html += '<div class="tool-item">&#128295; ' + currentTree.requiredTools[t] + '</div>';
+            }
+            html += '</div>';
+        }
+        document.getElementById('treeContent').innerHTML = html;
+    }
+
+    function renderResolution(node) {
+        var sevClass = 'severity-' + (node.severity || 'low').toLowerCase();
+        var sevLabel = 'sev-' + (node.severity || 'low').toLowerCase();
+        var html = '<div class="resolution-card ' + sevClass + '">';
+        html += '<div class="resolution-title">' + (node.title || 'Resolution') + '</div>';
+        html += '<span class="resolution-severity ' + sevLabel + '">' + (node.severity || 'INFO') + '</span>';
+        html += '<div class="resolution-text">' + node.text + '</div>';
+        if (node.warning) html += '<div class="diag-warning">' + node.warning + '</div>';
+        if (node.action) {
+            html += '<div class="resolution-section-label">Action Required</div>';
+            html += '<div class="resolution-action">' + node.action + '</div>';
+        }
+        if (node.help) {
+            html += '<div class="resolution-section-label">Additional Info</div>';
+            html += '<div class="resolution-action">' + node.help + '</div>';
+        }
+        if (node.partsNeeded && node.partsNeeded.length > 0) {
+            html += '<div class="resolution-section-label">Parts Needed</div>';
+            for (var p = 0; p < node.partsNeeded.length; p++) {
+                html += '<div class="resolution-part-item">&#8226; ' + node.partsNeeded[p] + '</div>';
+            }
+        }
+        if (node.estimatedTime) {
+            html += '<div class="resolution-section-label">Estimated Time</div>';
+            html += '<div class="resolution-action">' + node.estimatedTime + '</div>';
+        }
+        html += '<div style="margin-top:20px;">';
+        html += '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">&#8592; Back</button>';
+        html += '<button class="resolution-start-over" onclick="startOver()">New Diagnosis</button>';
+        html += '</div></div>';
+        document.getElementById('treeContent').innerHTML = html;
+    }
+
+    </script>
+
+</body>
+</html>

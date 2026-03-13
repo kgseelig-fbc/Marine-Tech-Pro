@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Engine Specs — Marine Tech Pro</title>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <link rel="stylesheet" href="css/styles.css">
+    <style>
+        .top-bar-logo {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            object-fit: cover;
+            margin-right: 8px;
+            vertical-align: middle;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP BAR -->
+    <header class="top-bar">
+        <a href="index.html" class="back-link">← Home</a>
+        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Engine Specs</h1>
+        <span style="width:60px"></span>
+    </header>
+
+    <h2 class="page-title">Select Engine</h2>
+    <p class="page-subtitle">Tap an engine to view full specifications</p>
+
+    <div class="engine-pick-row" id="engineButtons"></div>
+    <div id="specDisplay"></div>
+
+    <script src="js/engineSpecs.js"></script>
+
+    <script>
+
+    var activeEngine = null;
+
+    window.onload = function() {
+        var container = document.getElementById('engineButtons');
+
+        if (!window.engineSpecDatabase) {
+            container.innerHTML = '<p style="padding:20px; color:red;">Error: engineSpecs.js not loaded.</p>';
+            return;
+        }
+
+        var html = '';
+        for (var i = 0; i < window.engineSpecDatabase.length; i++) {
+            var eng = window.engineSpecDatabase[i];
+            html = html + '<button class="engine-pick-btn" id="engBtn_' + i + '" onclick="showEngine(' + i + ')">';
+            html = html + eng.name;
+            html = html + '</button>';
+        }
+        container.innerHTML = html;
+    };
+
+    function showEngine(index) {
+        var eng = window.engineSpecDatabase[index];
+        activeEngine = index;
+
+        var allBtns = document.querySelectorAll('.engine-pick-btn');
+        for (var b = 0; b < allBtns.length; b++) {
+            allBtns[b].className = 'engine-pick-btn';
+        }
+        document.getElementById('engBtn_' + index).className = 'engine-pick-btn active';
+
+        var html = '<div class="spec-card">';
+        html = html + '<div class="spec-engine-name">' + eng.name + '</div>';
+        html = html + '<div class="spec-years">' + eng.years + '</div>';
+
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Manufacturer', eng.manufacturer);
+        html = html + makeRow('Cylinders', eng.cylinders);
+        html = html + makeRow('Displacement', eng.displacement);
+        html = html + makeRow('Fuel System', eng.fuelSystem);
+        html = html + makeRow('Ignition', eng.ignition);
+        html = html + makeRow('Firing Order', eng.firingOrder);
+        html = html + makeRow('Gear Ratio', eng.gearRatio);
+        html = html + makeRow('Control System', eng.controlSystem);
+        html = html + makeRow('Diagnostic Tool', eng.diagnosticTool);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">RPM Specifications</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Idle (Neutral)', eng.idleNeutral);
+        html = html + makeRow('Idle (In Gear)', eng.idleInGear);
+        html = html + makeRow('WOT Range', eng.wotRange);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Spark Plugs</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Plug Type', eng.sparkPlug);
+        html = html + makeRow('Gap', eng.sparkGap);
+        html = html + makeRow('Torque', eng.sparkTorque);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Fuel System</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Fuel Pressure', eng.fuelPressure);
+        html = html + makeRow('Injector Resistance', eng.injectorResistance);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Compression</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Normal Range', eng.compressionNormal);
+        html = html + makeRow('Minimum', eng.compressionMin);
+        html = html + makeRow('Max Variation', eng.compressionVariation);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Lubrication</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Oil Type', eng.oilType);
+        html = html + makeRow('Oil Capacity', eng.oilCapacity);
+        html = html + makeRow('Oil Pressure (Idle)', eng.oilPressureIdle);
+        html = html + makeRow('Oil Pressure (WOT)', eng.oilPressureWOT);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Cooling System</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Thermostat Opens', eng.thermostatOpens);
+        html = html + makeRow('Normal Operating Temp', eng.normalTemp);
+        html = html + makeRow('Overheat Alarm', eng.overheatAlarm);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Charging System</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Type', eng.chargingType);
+        html = html + makeRow('Output', eng.chargingOutput);
+        html = html + makeRow('Regulated Voltage', eng.chargingVoltage);
+        html = html + '</table>';
+
+        html = html + '<div class="spec-divider">Lower Unit</div>';
+        html = html + '<table class="spec-table">';
+        html = html + makeRow('Gear Oil Capacity', eng.gearOilCapacity);
+        html = html + makeRow('Gear Oil Type', eng.gearOilType);
+        html = html + '</table>';
+
+        if (eng.notes && eng.notes.length > 0) {
+            html = html + '<div class="spec-divider">Special Notes</div>';
+            for (var n = 0; n < eng.notes.length; n++) {
+                html = html + '<div style="font-size:14px; padding:6px 0; color:#2c3e50; line-height:1.6;">' + eng.notes[n] + '</div>';
+            }
+        }
+
+        if (eng.maintenance) {
+            html = html + '<div class="spec-divider">Maintenance Schedule</div>';
+            for (var m = 0; m < eng.maintenance.length; m++) {
+                var sched = eng.maintenance[m];
+                html = html + '<div style="font-weight:700; font-size:15px; color:#1a3a5c; margin-top:14px;">' + sched.interval + '</div>';
+                for (var t = 0; t < sched.tasks.length; t++) {
+                    html = html + '<div style="font-size:14px; padding:3px 0 3px 12px; color:#2c3e50;">&#9744; ' + sched.tasks[t] + '</div>';
+                }
+            }
+        }
+
+        html = html + '</div>';
+        document.getElementById('specDisplay').innerHTML = html;
+        document.getElementById('specDisplay').scrollIntoView({ behavior: 'smooth' });
+    }
+
+    function makeRow(label, value) {
+        return '<tr><td>' + label + '</td><td>' + (value || '\u2014') + '</td></tr>';
+    }
+
+    </script>
+
+</body>
+</html>
