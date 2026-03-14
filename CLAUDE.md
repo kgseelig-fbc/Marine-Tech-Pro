@@ -1,0 +1,48 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+## Project Overview
+
+Marine Tech Pro is a field diagnostic and repair assistant web app for marine technicians, focused on Mercury and Yamaha 4-stroke outboard engines (115–300 HP). Built for Freedom Boat Club technicians.
+
+## Commands
+
+- **Install dependencies:** `npm install`
+- **Run the server:** `npm start` (runs `node server.js` on port 3000)
+- **Environment variables:** `PORT`, `ACCESS_CODE` (required for login), `SESSION_SECRET`, `NODE_ENV`
+
+There are no tests, linter, or build step configured.
+
+## Architecture
+
+This is a vanilla HTML/CSS/JS app served by an Express.js backend. No frameworks, no bundler, no transpilation.
+
+### Server (`server.js`)
+
+Express server with session-based authentication. The access code is set via the `ACCESS_CODE` env var. Routes:
+
+- `/login` (GET) and `/api/login` (POST) — authentication (case-insensitive code match)
+- `/api/logout` (POST) — session destroy
+- Auth middleware sits between public routes and `express.static`, so static assets (css/js/icons) bypass auth but HTML pages require it
+
+### Frontend (`public/`)
+
+Four HTML pages, each self-contained with inline `<script>` blocks:
+
+- **`index.html`** — Home/menu linking to the three feature pages
+- **`diagnose.html`** — Guided diagnostic decision trees. Loads `js/diagnosticTrees.js` and walks through `window.defined_trees[treeName]` via a state machine (`currentTree`, `currentNodeId`, `navHistory`). Node types: `question`, `instruction`, `resolution`
+- **`fault-codes.html`** — Searchable fault code lookup. Loads `js/faultcodes.js` (`window.faultCodeDatabase` array). Search filters by code, description, causes
+- **`specs.html`** — Engine spec reference. Loads `js/engineSpecs.js` (`window.engineSpecDatabase` array). Renders spec tables per engine
+
+### Data Files (`public/js/`)
+
+All domain data lives in three JS files that attach to `window`:
+
+- **`diagnosticTrees.js`** — `window.defined_trees` object. Each tree has `title`, `requiredTools`, `startNode`, and a `nodes` map. Trees: `engine_no_start`, `engine_overheat`, `engine_runs_rough`, `charging_electrical`, `trim_steering`, `electronics`, `stereo_audio`, `nav_lights`, `horn_system`
+- **`engineSpecs.js`** — `window.engineSpecDatabase` array of engine spec objects (Mercury and Yamaha models)
+- **`faultcodes.js`** — `window.faultCodeDatabase` array. Each entry has `code`, `manufacturer`, `severity`, `system`, `description`, `causes`, `steps`, `tools`, `parts` (causes/steps are pipe-delimited strings)
+
+### Styling
+
+`public/css/styles.css` — shared styles. Page-specific styles are in inline `<style>` blocks within each HTML file.
