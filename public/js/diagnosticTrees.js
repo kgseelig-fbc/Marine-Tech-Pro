@@ -2467,6 +2467,672 @@ window.defined_trees = {
 
             hr_fix_relay: { id: "hr_fix_relay", type: "resolution", severity: "LOW", title: "Horn Relay", text: "Horn relay has failed.", action: "Replace the relay with same type and rating. Check relay socket for corroded or melted pins.", partsNeeded: ["Horn relay"], estimatedTime: "15-30 minutes" }
         }
+    },
+
+    // =============================================
+    // TREE 10: BILGE PUMP
+    // =============================================
+    bilge_pump: {
+        title: "Bilge Pump",
+        requiredTools: [
+            "DMM",
+            "12V Test Light",
+            "Bucket of water (for float test)",
+            "Jumper wires"
+        ],
+        startNode: "bp_start",
+        nodes: {
+
+            bp_start: {
+                id: "bp_start",
+                type: "question",
+                text: "What is the bilge pump problem?",
+                warning: "A non-working bilge pump can sink the boat. Treat this as safety-critical before the customer launches.",
+                options: [
+                    { label: "Pump does not run in MANUAL or AUTO", next: "bp_dead" },
+                    { label: "Runs in MANUAL but not AUTO (float switch)", next: "bp_auto_fail" },
+                    { label: "Runs in AUTO but not MANUAL", next: "bp_manual_fail" },
+                    { label: "Runs continuously — won't shut off", next: "bp_runs_always" },
+                    { label: "Runs but does not pump water / pumps slowly", next: "bp_no_flow" },
+                    { label: "Cycles on/off rapidly", next: "bp_short_cycle" }
+                ]
+            },
+
+            bp_dead: {
+                id: "bp_dead",
+                type: "instruction",
+                text: "Check voltage at the pump with the switch in MANUAL.",
+                help: "Disconnect the pump connector. With the panel switch in MANUAL, probe the BROWN (+) and BLACK (-) pump wires. Brown is the standard ABYC color for bilge pump power.",
+                measurement: { label: "Voltage at pump in MANUAL", unit: "VDC", expectedRange: "12.0 – 13.5" },
+                options: [
+                    { label: "0V — no power reaching pump", next: "bp_no_power" },
+                    { label: "Low (under 10V)", next: "bp_voltage_drop" },
+                    { label: "12V+ present but pump does not run", next: "bp_pump_failed" }
+                ]
+            },
+
+            bp_no_power: {
+                id: "bp_no_power",
+                type: "instruction",
+                text: "Check the bilge pump fuse at the helm panel or fuse block.",
+                help: "Bilge pumps are typically on a dedicated fuse (3A–10A depending on pump GPH). Pull the fuse and test continuity.",
+                options: [
+                    { label: "Fuse blown", next: "bp_fix_fuse" },
+                    { label: "Fuse good — check helm switch", next: "bp_check_switch" }
+                ]
+            },
+
+            bp_check_switch: {
+                id: "bp_check_switch",
+                type: "instruction",
+                text: "Test the 3-position panel switch (OFF / AUTO / MANUAL).",
+                help: "With power on, probe the output side of the switch in each position. MANUAL should feed the pump directly. AUTO should only energize when the float closes. OFF should be dead.",
+                options: [
+                    { label: "Switch has no output in MANUAL", next: "bp_fix_switch" },
+                    { label: "Switch outputs 12V — wiring problem downstream", next: "fix_wiring" }
+                ]
+            },
+
+            bp_voltage_drop: {
+                id: "bp_voltage_drop",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Voltage Drop on Pump Circuit",
+                text: "Pump sees less than 10V — will not generate rated flow and will overheat.",
+                action: "Inspect the full pump circuit: fuse block, switch, connectors, and GROUND. Corroded crimp connectors in the bilge are the #1 cause. Replace any green or crusty terminals with heat-shrink butt splices. Verify ground runs to a clean bus or battery negative — never to a screw in the hull.",
+                partsNeeded: ["Heat-shrink butt connectors", "Tinned marine wire (14 or 16 AWG)", "Dielectric grease"],
+                estimatedTime: "30-60 minutes"
+            },
+
+            bp_pump_failed: {
+                id: "bp_pump_failed",
+                type: "instruction",
+                text: "Direct-test the pump with jumpers from the battery.",
+                help: "Pull the pump cartridge. Jumper brown to battery (+) and black to battery (-). A working pump should spin immediately.",
+                options: [
+                    { label: "Pump runs on direct power", next: "bp_intermittent_wiring" },
+                    { label: "Pump does not run — motor seized or burned", next: "bp_fix_pump" },
+                    { label: "Pump hums but impeller does not spin", next: "bp_fix_impeller" }
+                ]
+            },
+
+            bp_intermittent_wiring: {
+                id: "bp_intermittent_wiring",
+                type: "resolution",
+                severity: "LOW",
+                title: "Bad Pump Connector / Intermittent Wiring",
+                text: "Pump is good on the bench but does not run installed.",
+                action: "The pump connector is the usual suspect. Cut off the connector, strip back to clean copper, and install heat-shrink butt splices. Ensure the splice sits ABOVE the normal waterline or is fully waterproofed.",
+                partsNeeded: ["Heat-shrink butt connectors", "Dielectric grease"],
+                estimatedTime: "20-40 minutes"
+            },
+
+            bp_auto_fail: {
+                id: "bp_auto_fail",
+                type: "instruction",
+                text: "Test the float switch.",
+                help: "Lift the float by hand (or pour a bucket of water in the bilge). With the panel switch in AUTO, the pump should energize when the float rises.",
+                options: [
+                    { label: "Pump runs when float is lifted by hand", next: "bp_float_ok" },
+                    { label: "Pump does NOT run when float is lifted", next: "bp_check_float" }
+                ]
+            },
+
+            bp_float_ok: {
+                id: "bp_float_ok",
+                type: "resolution",
+                severity: "LOW",
+                title: "Float Switch Fouled or Obstructed",
+                text: "Float is mechanically blocked by debris, hoses, or wiring.",
+                action: "Clean the bilge. Remove trash, leaves, and hose kinks around the float. Re-mount the float so it has free vertical travel and is NOT in line with the discharge stream. Verify it is mounted at the LOW point of the bilge.",
+                estimatedTime: "15-30 minutes"
+            },
+
+            bp_check_float: {
+                id: "bp_check_float",
+                type: "instruction",
+                text: "Check continuity through the float switch with it lifted.",
+                help: "Disconnect the float wires. Set DMM to continuity. Lift the float — you should hear a click and get continuity. Lower it — continuity should open.",
+                options: [
+                    { label: "No continuity when lifted — float failed", next: "bp_fix_float" },
+                    { label: "Continuity is good — wiring problem to float", next: "fix_wiring" }
+                ]
+            },
+
+            bp_manual_fail: {
+                id: "bp_manual_fail",
+                type: "resolution",
+                severity: "LOW",
+                title: "Helm Switch Failure (MANUAL circuit)",
+                text: "Panel switch MANUAL contacts are bad or wire is broken. Pump still works through AUTO / float, so pump itself is fine.",
+                action: "Replace the helm 3-position bilge switch. Verify MANUAL wire runs directly to pump (bypasses float). Confirm AUTO wire routes through the float switch.",
+                partsNeeded: ["3-position bilge pump switch (OFF / AUTO / ON)"],
+                estimatedTime: "20-40 minutes"
+            },
+
+            bp_runs_always: {
+                id: "bp_runs_always",
+                type: "question",
+                text: "Does the pump stop if you put the panel switch in OFF?",
+                help: "If it stops in OFF, the float switch or the AUTO wire is stuck ON. If it keeps running in OFF, the MANUAL circuit is shorted to 12V.",
+                options: [
+                    { label: "Stops in OFF — AUTO side stuck", next: "bp_float_stuck" },
+                    { label: "Keeps running in OFF — MANUAL shorted to 12V", next: "bp_manual_short" }
+                ]
+            },
+
+            bp_float_stuck: {
+                id: "bp_float_stuck",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Float Switch Stuck Closed",
+                text: "Float is mechanically stuck up or internally welded closed.",
+                action: "Inspect float for debris, hose pressure, or oil film that traps it. If the float is clean but continuity stays closed with it down, replace the float switch. Electronic float switches (no moving parts) are a good upgrade.",
+                partsNeeded: ["Marine float switch (or electronic solid-state float)"],
+                estimatedTime: "30-60 minutes"
+            },
+
+            bp_manual_short: {
+                id: "bp_manual_short",
+                type: "resolution",
+                severity: "HIGH",
+                title: "MANUAL Wire Shorted to Power",
+                text: "The MANUAL feed is hot even with the helm switch OFF. Pump will run until the battery dies.",
+                action: "Trace the MANUAL wire from the helm switch to the pump. Look for chafe points where the wire passes through bulkheads or contacts other 12V wires. Repair with heat-shrink and protect with split loom.",
+                partsNeeded: ["Tinned marine wire", "Heat-shrink connectors", "Split loom"],
+                estimatedTime: "30-90 minutes"
+            },
+
+            bp_no_flow: {
+                id: "bp_no_flow",
+                type: "question",
+                text: "When the pump runs, do you hear and feel it pumping?",
+                help: "A bilge pump moves a lot of water. If the motor spins but no flow, something is blocking the discharge path or the impeller is gone.",
+                options: [
+                    { label: "Hear motor running but no water out — impeller stripped", next: "bp_fix_impeller" },
+                    { label: "Water dribbles out — hose kinked or clogged", next: "bp_fix_hose" },
+                    { label: "Water exits but then drains back in", next: "bp_check_check" }
+                ]
+            },
+
+            bp_check_check: {
+                id: "bp_check_check",
+                type: "resolution",
+                severity: "LOW",
+                title: "Missing or Failed Anti-Siphon / Check Valve",
+                text: "Water siphons back through the discharge after the pump cycles off.",
+                action: "Confirm the discharge hose has either (a) a high loop 6-12\" ABOVE the waterline or (b) an anti-siphon vented loop. Do NOT install a simple check valve — they are known to stick closed and prevent pumping. Re-route hose with a proper high loop.",
+                partsNeeded: ["Anti-siphon vented loop (if needed)", "Bilge hose", "Hose clamps"],
+                estimatedTime: "45-90 minutes"
+            },
+
+            bp_short_cycle: {
+                id: "bp_short_cycle",
+                type: "resolution",
+                severity: "LOW",
+                title: "Pump Short-Cycling",
+                text: "Pump cycles every few seconds — float set too close to pump pickup, or water draining back.",
+                action: "Raise the float switch so it sits higher above the pump. Add a high-loop or vented loop on the discharge. If using an electronic float, increase the on/off differential setting. Check for minor leak (shaft seal, rainwater) that is constantly re-filling the bilge.",
+                estimatedTime: "30-60 minutes"
+            },
+
+            // BILGE RESOLUTIONS
+            bp_fix_fuse: { id: "bp_fix_fuse", type: "resolution", severity: "LOW", title: "Blown Bilge Fuse", text: "Bilge pump fuse has blown.", action: "Replace with same amperage rating. If it blows again immediately, the pump is seized or wiring is shorted to ground — find the short before installing a new fuse.", partsNeeded: ["Replacement fuse (match rating)"], estimatedTime: "10 minutes" },
+
+            bp_fix_switch: { id: "bp_fix_switch", type: "resolution", severity: "LOW", title: "Helm Bilge Switch", text: "3-position bilge switch has failed.", action: "Replace the OFF/AUTO/ON panel switch. Label wires before removing: B+ (feed), MANUAL (to pump), AUTO (to float). Use tinned marine switch.", partsNeeded: ["3-position bilge pump switch"], estimatedTime: "20-40 minutes" },
+
+            bp_fix_pump: { id: "bp_fix_pump", type: "resolution", severity: "MEDIUM", title: "Pump Motor Failure", text: "Pump motor has failed — seized, burned, or shorted.", action: "Replace the pump cartridge. Most brands (Rule, Attwood, Johnson) use a base that stays mounted — you just swap the motor cartridge. Match GPH rating. Test before re-installing.", partsNeeded: ["Replacement bilge pump cartridge (match GPH)"], estimatedTime: "30-60 minutes" },
+
+            bp_fix_impeller: { id: "bp_fix_impeller", type: "resolution", severity: "LOW", title: "Stripped Impeller", text: "Impeller splines stripped or impeller shaft broken. Motor spins but no flow.", action: "Replace the pump cartridge — impellers are not typically serviced separately on centrifugal bilge pumps.", partsNeeded: ["Replacement bilge pump cartridge"], estimatedTime: "30-60 minutes" },
+
+            bp_fix_float: { id: "bp_fix_float", type: "resolution", severity: "LOW", title: "Float Switch Replacement", text: "Float switch has failed.", action: "Replace the float switch. Mount it so it has free vertical travel and is at the LOW point of the bilge. Keep wire splices ABOVE waterline, heat-shrink only. Consider an electronic solid-state float for longer service life.", partsNeeded: ["Marine float switch (or electronic)"], estimatedTime: "30-60 minutes" },
+
+            bp_fix_hose: { id: "bp_fix_hose", type: "resolution", severity: "LOW", title: "Kinked or Clogged Discharge Hose", text: "Discharge hose is kinked, clogged, or too long a run.", action: "Straighten the hose. Remove debris (leaves, fish scales, sludge). Verify through-hull is clear. Use reinforced bilge hose to prevent collapse. Minimize run length.", partsNeeded: ["Bilge discharge hose", "Hose clamps"], estimatedTime: "30-60 minutes" },
+
+            fix_wiring: { id: "fix_wiring", type: "resolution", severity: "MEDIUM", title: "Wiring Repair", text: "Damaged or corroded wiring found between the switch and the pump.", action: "Repair with tinned marine wire and adhesive heat-shrink butt connectors. Solder + heat shrink is best. Keep all splices above the waterline.", warning: "NEVER use household wire, wire nuts, or electrical tape on a boat. Fire hazard.", partsNeeded: ["Tinned marine wire", "Adhesive heat-shrink butt connectors", "Heat gun", "Dielectric grease"], estimatedTime: "30 min – 2 hours" }
+        }
+    },
+
+    // =============================================
+    // TREE 11: LIVEWELL PUMP
+    // =============================================
+    livewell_pump: {
+        title: "Livewell Pump",
+        requiredTools: [
+            "DMM",
+            "12V Test Light",
+            "Jumper wires",
+            "Small brush / pick for intake screen"
+        ],
+        startNode: "lw_start",
+        nodes: {
+
+            lw_start: {
+                id: "lw_start",
+                type: "question",
+                text: "What is the livewell problem?",
+                options: [
+                    { label: "Pump does not run at all", next: "lw_dead" },
+                    { label: "Pump runs but no water flow", next: "lw_no_flow" },
+                    { label: "Pump runs weak / low flow", next: "lw_low_flow" },
+                    { label: "Livewell does not hold water (drains out)", next: "lw_wont_hold" },
+                    { label: "Livewell overflows / won't stop filling", next: "lw_overflow" },
+                    { label: "Aerator / recirc does not work", next: "lw_aerator" }
+                ]
+            },
+
+            lw_dead: {
+                id: "lw_dead",
+                type: "instruction",
+                text: "Check voltage at the livewell pump with the switch ON.",
+                help: "Livewell pumps are typically on a dedicated switch. Probe the pump feed wires with the switch ON.",
+                measurement: { label: "Voltage at pump", unit: "VDC", expectedRange: "12.0 – 13.5" },
+                options: [
+                    { label: "0V", next: "lw_no_power" },
+                    { label: "Low (under 10V)", next: "lw_voltage_drop" },
+                    { label: "12V+ but pump does not run", next: "lw_pump_test" }
+                ]
+            },
+
+            lw_no_power: {
+                id: "lw_no_power",
+                type: "instruction",
+                text: "Check the livewell fuse and switch.",
+                options: [
+                    { label: "Fuse blown", next: "lw_fix_fuse" },
+                    { label: "Fuse good — test helm switch", next: "lw_check_switch" }
+                ]
+            },
+
+            lw_check_switch: {
+                id: "lw_check_switch",
+                type: "instruction",
+                text: "Probe the output of the livewell switch with it ON.",
+                options: [
+                    { label: "No output — switch failed", next: "lw_fix_switch" },
+                    { label: "12V output — wiring problem downstream", next: "fix_wiring" }
+                ]
+            },
+
+            lw_voltage_drop: {
+                id: "lw_voltage_drop",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Voltage Drop on Livewell Circuit",
+                text: "Corroded connectors or undersized wire.",
+                action: "Inspect all connectors from fuse block through switch to pump. Replace crusty crimps with heat-shrink butt connectors. Verify wire gauge is 14 AWG minimum for typical 500-800 GPH livewell pumps. Check the ground — livewell pumps often share a ground bus that corrodes.",
+                partsNeeded: ["Tinned marine wire (14 AWG)", "Heat-shrink butt connectors"],
+                estimatedTime: "30-60 minutes"
+            },
+
+            lw_pump_test: {
+                id: "lw_pump_test",
+                type: "instruction",
+                text: "Direct-jumper the pump from the battery.",
+                help: "Most livewell pumps use a cartridge motor that lifts off a threaded base. Test on the bench.",
+                options: [
+                    { label: "Pump runs direct — bad connector", next: "lw_intermittent" },
+                    { label: "Pump does not run — motor failed", next: "lw_fix_pump" }
+                ]
+            },
+
+            lw_intermittent: {
+                id: "lw_intermittent",
+                type: "resolution",
+                severity: "LOW",
+                title: "Bad Pump Connector",
+                text: "Pump works on the bench but not installed.",
+                action: "Re-terminate the pump connector. Cut back to clean copper, use heat-shrink butt splices, apply dielectric grease. Mount the splice above waterline.",
+                partsNeeded: ["Heat-shrink butt connectors", "Dielectric grease"],
+                estimatedTime: "20-40 minutes"
+            },
+
+            lw_no_flow: {
+                id: "lw_no_flow",
+                type: "question",
+                text: "Is the boat IN the water or on the trailer?",
+                help: "Livewell pumps are NOT self-priming. They must be below the waterline or submerged to pump.",
+                options: [
+                    { label: "On trailer — not submerged", next: "lw_not_primed" },
+                    { label: "In water — submerged", next: "lw_check_intake" }
+                ]
+            },
+
+            lw_not_primed: {
+                id: "lw_not_primed",
+                type: "resolution",
+                severity: "LOW",
+                title: "Pump Is Not Self-Priming",
+                text: "Livewell pumps must be BELOW the waterline with free water access. They cannot suck water up to them.",
+                action: "Test the boat in the water, not on the trailer. If the pump is above the waterline at rest, that is a design/install problem — the pump must be re-located to the lowest point of the livewell system or a self-priming pump (impeller-type) must be used.",
+                estimatedTime: "10 minutes (explain to customer) or 2+ hours to re-plumb"
+            },
+
+            lw_check_intake: {
+                id: "lw_check_intake",
+                type: "instruction",
+                text: "Inspect the intake thru-hull / strainer screen.",
+                help: "Livewell intake scoops clog with weeds, baitfish, algae, and mud. This is by far the most common complaint.",
+                options: [
+                    { label: "Intake clogged — cleaned it", next: "lw_fix_intake" },
+                    { label: "Intake clear — check hose and impeller", next: "lw_check_hose" }
+                ]
+            },
+
+            lw_check_hose: {
+                id: "lw_check_hose",
+                type: "instruction",
+                text: "Check the intake hose for kinks, collapse, or air leaks, and check pump impeller.",
+                help: "A soft non-reinforced hose can collapse under suction. Air leaks on the suction side cause the pump to draw air instead of water.",
+                options: [
+                    { label: "Hose collapsed or kinked", next: "lw_fix_hose" },
+                    { label: "Hose OK — pump impeller worn", next: "lw_fix_pump" }
+                ]
+            },
+
+            lw_low_flow: {
+                id: "lw_low_flow",
+                type: "instruction",
+                text: "Common causes of low flow: clogged intake screen, worn impeller, voltage drop, or partially closed valve.",
+                options: [
+                    { label: "Intake screen partially blocked", next: "lw_fix_intake" },
+                    { label: "Impeller worn", next: "lw_fix_pump" },
+                    { label: "Voltage at pump under 12V", next: "lw_voltage_drop" },
+                    { label: "Diverter or fill/drain valve partially closed", next: "lw_fix_valve" }
+                ]
+            },
+
+            lw_wont_hold: {
+                id: "lw_wont_hold",
+                type: "question",
+                text: "Where is the water going?",
+                options: [
+                    { label: "Drains out the overflow standpipe", next: "lw_standpipe" },
+                    { label: "Drains back out the pump intake", next: "lw_backflow" },
+                    { label: "Leaks into the bilge (cracked tank or hose)", next: "lw_leak" }
+                ]
+            },
+
+            lw_standpipe: {
+                id: "lw_standpipe",
+                type: "resolution",
+                severity: "LOW",
+                title: "Overflow Standpipe Too Short or Missing",
+                text: "Livewells use a removable standpipe to set water level. If it is missing or too short, water runs straight to the overflow drain.",
+                action: "Install or replace the standpipe. Most livewells take a 1\" or 1-1/4\" ABS or PVC standpipe. Set length to desired water level.",
+                partsNeeded: ["Standpipe (match livewell drain size)"],
+                estimatedTime: "5-15 minutes"
+            },
+
+            lw_backflow: {
+                id: "lw_backflow",
+                type: "resolution",
+                severity: "LOW",
+                title: "Water Siphoning Out Through Pump",
+                text: "With pump off, water drains back through the pump/intake when boat is in the water.",
+                action: "Verify there is an anti-siphon / vented loop on the livewell plumbing if the tank is above the waterline. If the pump housing has lost its flapper / duckbill valve, replace the valve kit.",
+                partsNeeded: ["Duckbill / flapper valve kit (if applicable)", "Vented loop (if needed)"],
+                estimatedTime: "30-90 minutes"
+            },
+
+            lw_leak: {
+                id: "lw_leak",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Livewell Leak",
+                text: "Tank or plumbing is leaking into the bilge.",
+                action: "Fill the livewell and inspect under it. Common leaks: drain fitting gasket, standpipe base O-ring, cracked tank, split hose. Re-seal fittings with marine sealant. Replace split hose with reinforced livewell hose. Cracked tanks can sometimes be repaired with plastic welding; often the fix is tank replacement.",
+                partsNeeded: ["Marine sealant (3M 4200 or equivalent)", "Replacement gaskets / O-rings", "Reinforced livewell hose"],
+                estimatedTime: "30 minutes - 3 hours depending on root cause"
+            },
+
+            lw_overflow: {
+                id: "lw_overflow",
+                type: "question",
+                text: "Does the customer have a timer / auto fill feature?",
+                options: [
+                    { label: "Yes — timer stuck ON", next: "lw_fix_timer" },
+                    { label: "No — manual switch stuck ON", next: "lw_fix_switch" },
+                    { label: "Switch is OFF but pump still runs", next: "lw_fix_wiring" }
+                ]
+            },
+
+            lw_aerator: {
+                id: "lw_aerator",
+                type: "question",
+                text: "Does the aerator / recirc pump run?",
+                help: "Many livewells have TWO pumps: a fill/intake pump, and a separate aerator/recirc pump that circulates water inside the tank.",
+                options: [
+                    { label: "No power to aerator — treat as dead pump", next: "lw_dead" },
+                    { label: "Runs but bubbles weak", next: "lw_fix_aerator" }
+                ]
+            },
+
+            // LIVEWELL RESOLUTIONS
+            lw_fix_fuse: { id: "lw_fix_fuse", type: "resolution", severity: "LOW", title: "Blown Livewell Fuse", text: "Fuse has blown.", action: "Replace with same amperage. If it blows again, check for a seized pump or short.", partsNeeded: ["Replacement fuse"], estimatedTime: "10 minutes" },
+
+            lw_fix_switch: { id: "lw_fix_switch", type: "resolution", severity: "LOW", title: "Livewell Switch", text: "Helm livewell switch has failed or is stuck.", action: "Replace the switch. Use marine-rated rocker or toggle. Match circuit (momentary vs. maintained) to original.", partsNeeded: ["Marine rocker/toggle switch"], estimatedTime: "20-40 minutes" },
+
+            lw_fix_pump: { id: "lw_fix_pump", type: "resolution", severity: "MEDIUM", title: "Livewell Pump Replacement", text: "Pump motor or impeller has failed.", action: "Replace the pump cartridge. Match GPH (typically 500, 800, or 1100) to the original. Test on bench before final install.", partsNeeded: ["Livewell pump cartridge (match GPH)"], estimatedTime: "30-60 minutes" },
+
+            lw_fix_intake: { id: "lw_fix_intake", type: "resolution", severity: "LOW", title: "Clean Intake Screen", text: "Intake strainer or thru-hull scoop is clogged.", action: "Clean the intake screen. Remove weeds, mud, baitfish. Back-flush if possible. Reinstall screen — never run without one, as debris will jam the impeller.", estimatedTime: "15-30 minutes" },
+
+            lw_fix_hose: { id: "lw_fix_hose", type: "resolution", severity: "LOW", title: "Livewell Hose Replacement", text: "Hose is kinked, collapsed, or leaking air on suction side.", action: "Replace with reinforced livewell hose. Use double stainless clamps at all connections. Route without kinks or sharp bends.", partsNeeded: ["Reinforced livewell hose", "Stainless hose clamps"], estimatedTime: "30-90 minutes" },
+
+            lw_fix_valve: { id: "lw_fix_valve", type: "resolution", severity: "LOW", title: "Diverter / Ball Valve", text: "Diverter valve is partially closed or stuck.", action: "Work the valve through full travel. If internals are corroded or handle is broken, replace the valve. Use marine-grade bronze or reinforced nylon.", partsNeeded: ["Replacement ball valve / diverter (match size and thread)"], estimatedTime: "30-90 minutes" },
+
+            lw_fix_timer: { id: "lw_fix_timer", type: "resolution", severity: "LOW", title: "Livewell Timer", text: "Auto-fill timer is stuck on.", action: "Replace the timer module. Verify wiring matches the new unit's labels. Some boats use a combined timer/aerator controller — replace as an assembly.", partsNeeded: ["Livewell timer / aerator controller"], estimatedTime: "30-60 minutes" },
+
+            lw_fix_wiring: { id: "lw_fix_wiring", type: "resolution", severity: "MEDIUM", title: "Pump Feed Shorted to 12V", text: "Pump runs with switch OFF — wire shorted to power somewhere in the run.", action: "Trace the pump feed wire for chafe points. Repair with heat-shrink and protect with split loom.", partsNeeded: ["Tinned marine wire", "Heat-shrink connectors", "Split loom"], estimatedTime: "30-90 minutes" },
+
+            lw_fix_aerator: { id: "lw_fix_aerator", type: "resolution", severity: "LOW", title: "Aerator Weak", text: "Aerator runs but output is weak.", action: "Check for a clogged air-injection venturi (the small air line on many aerator heads). Clean or replace. If impeller is worn, replace the aerator cartridge.", partsNeeded: ["Aerator cartridge or venturi head"], estimatedTime: "30-60 minutes" },
+
+            fix_wiring: { id: "fix_wiring", type: "resolution", severity: "MEDIUM", title: "Wiring Repair", text: "Damaged or corroded wiring found between the switch and the pump.", action: "Repair with tinned marine wire and adhesive heat-shrink butt connectors. Solder + heat shrink is best. Keep all splices above the waterline.", warning: "NEVER use household wire, wire nuts, or electrical tape on a boat. Fire hazard.", partsNeeded: ["Tinned marine wire", "Adhesive heat-shrink butt connectors", "Heat gun", "Dielectric grease"], estimatedTime: "30 min – 2 hours" }
+        }
+    },
+
+    // =============================================
+    // TREE 12: WASHDOWN PUMP
+    // =============================================
+    washdown_pump: {
+        title: "Washdown Pump",
+        requiredTools: [
+            "DMM",
+            "12V Test Light",
+            "Jumper wires"
+        ],
+        startNode: "wd_start",
+        nodes: {
+
+            wd_start: {
+                id: "wd_start",
+                type: "question",
+                text: "What is the washdown pump problem?",
+                help: "Washdown pumps are self-priming diaphragm pumps (typically Shurflo or Jabsco) that draw raw water from a thru-hull and feed a hose/nozzle. They run on a pressure switch — on when pressure drops, off when the nozzle is closed.",
+                options: [
+                    { label: "Pump does not run at all when nozzle opens", next: "wd_dead" },
+                    { label: "Pump runs but no water comes out", next: "wd_no_flow" },
+                    { label: "Pump cycles on/off rapidly (chatters)", next: "wd_chatter" },
+                    { label: "Pump runs continuously — won't shut off", next: "wd_runs_always" },
+                    { label: "Pump runs but output is weak / low pressure", next: "wd_low_pressure" },
+                    { label: "Pump is noisy or vibrating", next: "wd_noisy" }
+                ]
+            },
+
+            wd_dead: {
+                id: "wd_dead",
+                type: "instruction",
+                text: "With the washdown panel switch ON and the nozzle OPEN, check voltage at the pump.",
+                measurement: { label: "Voltage at pump", unit: "VDC", expectedRange: "12.0 – 13.5" },
+                options: [
+                    { label: "0V", next: "wd_no_power" },
+                    { label: "Low (under 10V)", next: "wd_voltage_drop" },
+                    { label: "12V+ but pump does not run", next: "wd_pump_test" }
+                ]
+            },
+
+            wd_no_power: {
+                id: "wd_no_power",
+                type: "question",
+                text: "Most washdown pumps only have power when (a) panel switch is ON, (b) pressure switch senses pressure drop. What do you see?",
+                options: [
+                    { label: "Fuse blown", next: "wd_fix_fuse" },
+                    { label: "Panel switch has no output", next: "wd_fix_switch" },
+                    { label: "Panel switch outputs 12V but pump still dead — pressure switch", next: "wd_pressure_switch" }
+                ]
+            },
+
+            wd_pressure_switch: {
+                id: "wd_pressure_switch",
+                type: "instruction",
+                text: "Test the integrated pressure switch on the pump head.",
+                help: "Most Shurflo/Jabsco washdown pumps have an internal pressure switch. With the panel switch ON and nozzle OPEN, there should be 12V on both sides of the pressure switch. With nozzle CLOSED, system pressure rises and the switch opens, cutting power to the motor.",
+                options: [
+                    { label: "No continuity across pressure switch with nozzle open — switch failed", next: "wd_fix_pressure_switch" },
+                    { label: "Continuity good — internal motor wiring failed", next: "wd_fix_pump" }
+                ]
+            },
+
+            wd_voltage_drop: {
+                id: "wd_voltage_drop",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Voltage Drop",
+                text: "Washdown pump motors draw 6-10A. Voltage drop under load prevents them from starting.",
+                action: "Upsize the wiring if original is under 14 AWG. Clean all crimp connections — replace with heat-shrink butt splices. Verify ground runs to a clean point. Check panel switch and any inline fuse holder for heat damage.",
+                partsNeeded: ["Tinned marine wire (12 or 14 AWG)", "Heat-shrink butt connectors", "Fuse holder (if heat damaged)"],
+                estimatedTime: "45-90 minutes"
+            },
+
+            wd_pump_test: {
+                id: "wd_pump_test",
+                type: "instruction",
+                text: "Direct-jumper the pump motor leads from the battery (bypass the pressure switch).",
+                help: "On Shurflo pumps, you can often probe motor leads at the pressure-switch head.",
+                options: [
+                    { label: "Motor runs on direct power", next: "wd_fix_pressure_switch" },
+                    { label: "Motor does not run — motor seized or brushes worn", next: "wd_fix_pump" }
+                ]
+            },
+
+            wd_no_flow: {
+                id: "wd_no_flow",
+                type: "question",
+                text: "When the pump runs, do you hear a healthy chugging sound or does it spin freely with no resistance?",
+                help: "A diaphragm pump under load sounds like a quick 'chug-chug-chug'. If it spins freely with no resistance, it is not moving water.",
+                options: [
+                    { label: "Spins freely — pump losing prime / sucking air", next: "wd_prime" },
+                    { label: "Chugs normally — blockage downstream", next: "wd_check_nozzle" }
+                ]
+            },
+
+            wd_prime: {
+                id: "wd_prime",
+                type: "question",
+                text: "Check the SUCTION side (intake). Common issues:",
+                options: [
+                    { label: "Intake strainer clogged", next: "wd_fix_strainer" },
+                    { label: "Suction hose cracked or loose clamp — air leak", next: "wd_fix_suction" },
+                    { label: "Thru-hull seacock closed or clogged", next: "wd_fix_seacock" },
+                    { label: "Pump head diaphragm torn — replace head kit", next: "wd_fix_head" }
+                ]
+            },
+
+            wd_check_nozzle: {
+                id: "wd_check_nozzle",
+                type: "question",
+                text: "Pump is pumping — check the discharge side.",
+                options: [
+                    { label: "Nozzle clogged", next: "wd_fix_nozzle" },
+                    { label: "Hose kinked or crimped", next: "wd_fix_hose" },
+                    { label: "Inline filter after pump is clogged", next: "wd_fix_filter" }
+                ]
+            },
+
+            wd_chatter: {
+                id: "wd_chatter",
+                type: "instruction",
+                text: "Short-cycling / chattering means system pressure is not holding steady. Causes:",
+                options: [
+                    { label: "Small leak in pressure side (drip at nozzle or fitting)", next: "wd_fix_leak" },
+                    { label: "Pressure switch differential too tight / failing", next: "wd_fix_pressure_switch" },
+                    { label: "Missing accumulator — consider adding one", next: "wd_fix_accumulator" }
+                ]
+            },
+
+            wd_runs_always: {
+                id: "wd_runs_always",
+                type: "question",
+                text: "Does the pump stop when you turn the PANEL switch off?",
+                options: [
+                    { label: "Yes — system never builds pressure", next: "wd_no_pressure" },
+                    { label: "No — pump wire shorted to 12V", next: "wd_fix_short" }
+                ]
+            },
+
+            wd_no_pressure: {
+                id: "wd_no_pressure",
+                type: "question",
+                text: "Pump runs but never builds pressure to trip the pressure switch off. Check:",
+                options: [
+                    { label: "Small leak somewhere on discharge side", next: "wd_fix_leak" },
+                    { label: "Diaphragm or internal valve failed — rebuild head", next: "wd_fix_head" },
+                    { label: "Pressure switch set too high / failed", next: "wd_fix_pressure_switch" }
+                ]
+            },
+
+            wd_low_pressure: {
+                id: "wd_low_pressure",
+                type: "instruction",
+                text: "Pump runs but the spray is weak. Most common: worn pump head, clogged strainer, or voltage drop.",
+                options: [
+                    { label: "Intake strainer partially blocked", next: "wd_fix_strainer" },
+                    { label: "Diaphragm or valves worn — rebuild head", next: "wd_fix_head" },
+                    { label: "Voltage under 12V at pump", next: "wd_voltage_drop" },
+                    { label: "Nozzle clogged or wrong pattern", next: "wd_fix_nozzle" }
+                ]
+            },
+
+            wd_noisy: {
+                id: "wd_noisy",
+                type: "resolution",
+                severity: "LOW",
+                title: "Pump Vibration / Noise",
+                text: "Diaphragm pumps transmit vibration to the hull.",
+                action: "Confirm the pump is mounted on its rubber feet / isolators (never bolt direct to hull). Install short sections of flexible hose on BOTH inlet and outlet (no rigid pipe direct to pump ports). If the pump is old and noise is new, internal bearings or diaphragm may be worn — rebuild or replace.",
+                partsNeeded: ["Rubber mounting feet", "Short sections of flexible hose", "Hose clamps"],
+                estimatedTime: "30-60 minutes"
+            },
+
+            // WASHDOWN RESOLUTIONS
+            wd_fix_fuse: { id: "wd_fix_fuse", type: "resolution", severity: "LOW", title: "Blown Washdown Fuse", text: "Fuse blown.", action: "Replace with same amperage. If it blows again immediately, pump is seized or wiring is shorted.", partsNeeded: ["Replacement fuse"], estimatedTime: "10 minutes" },
+
+            wd_fix_switch: { id: "wd_fix_switch", type: "resolution", severity: "LOW", title: "Washdown Switch", text: "Panel switch failed.", action: "Replace with marine-rated rocker or toggle switch. Match original amp rating.", partsNeeded: ["Marine rocker/toggle switch"], estimatedTime: "20-40 minutes" },
+
+            wd_fix_pressure_switch: { id: "wd_fix_pressure_switch", type: "resolution", severity: "LOW", title: "Pressure Switch Replacement", text: "Internal pressure switch on pump head has failed.", action: "Most Shurflo/Jabsco pumps have a replaceable pressure switch on top of the pump head — two screws and two wires. Match part number to pump model. Set pressure to factory spec (typically 40-60 PSI for washdown).", partsNeeded: ["Pressure switch (match pump model)"], estimatedTime: "20-40 minutes" },
+
+            wd_fix_pump: { id: "wd_fix_pump", type: "resolution", severity: "MEDIUM", title: "Pump Motor Replacement", text: "Pump motor has failed — seized, brushes worn, or internal short.", action: "On a well-used pump, the motor is usually not economical to rebuild — replace the complete pump. Match GPM and pressure spec. Verify mount pattern matches original or adapt plumbing.", partsNeeded: ["Washdown pump (match GPM and pressure)"], estimatedTime: "60-120 minutes" },
+
+            wd_fix_head: { id: "wd_fix_head", type: "resolution", severity: "MEDIUM", title: "Pump Head Rebuild", text: "Diaphragm, valves, or head internals are worn.", action: "Install a pump head rebuild kit. Kit typically includes diaphragm, check valves, and gaskets. Torque head screws evenly in a cross pattern — over-tightening distorts the diaphragm.", partsNeeded: ["Pump head rebuild kit (match pump model)"], estimatedTime: "45-90 minutes" },
+
+            wd_fix_strainer: { id: "wd_fix_strainer", type: "resolution", severity: "LOW", title: "Clean Intake Strainer", text: "Intake strainer is clogged.", action: "Remove, clean, and reinstall the strainer. Back-flush with fresh water. Replace if the screen is damaged. Never run the pump without a strainer — debris will destroy the diaphragm valves.", partsNeeded: ["Replacement strainer cartridge (if damaged)"], estimatedTime: "15-30 minutes" },
+
+            wd_fix_suction: { id: "wd_fix_suction", type: "resolution", severity: "LOW", title: "Suction-Side Air Leak", text: "Suction hose is cracked or a clamp is loose. Pump sucks air and cannot prime.", action: "Replace suction hose with reinforced marine hose. Double-clamp all connections on the suction side with stainless clamps.", partsNeeded: ["Reinforced marine hose (match pump inlet)", "Stainless hose clamps"], estimatedTime: "30-60 minutes" },
+
+            wd_fix_seacock: { id: "wd_fix_seacock", type: "resolution", severity: "LOW", title: "Seacock / Thru-Hull Blocked", text: "Raw water intake is closed or fouled.", action: "Open seacock. Back-flush the thru-hull with fresh water or clear with a bent wire. If the seacock is seized, service or replace it. Install an intake strainer before the pump if there is not one already.", partsNeeded: ["Intake strainer (if missing)", "Seacock service kit (if needed)"], estimatedTime: "30-90 minutes" },
+
+            wd_fix_nozzle: { id: "wd_fix_nozzle", type: "resolution", severity: "LOW", title: "Clogged Nozzle", text: "Washdown nozzle orifice is clogged with sand or salt.", action: "Remove, disassemble, soak in vinegar or descaler, flush. Replace if corroded internally.", partsNeeded: ["Replacement washdown nozzle (if needed)"], estimatedTime: "15-30 minutes" },
+
+            wd_fix_hose: { id: "wd_fix_hose", type: "resolution", severity: "LOW", title: "Kinked Discharge Hose", text: "Discharge hose is kinked or crushed.", action: "Re-route hose without sharp bends. Replace kinked section with reinforced marine hose.", partsNeeded: ["Reinforced marine hose", "Hose clamps"], estimatedTime: "30-60 minutes" },
+
+            wd_fix_filter: { id: "wd_fix_filter", type: "resolution", severity: "LOW", title: "Clogged Inline Filter", text: "Inline filter between pump and nozzle is clogged.", action: "Remove and clean the filter element. Replace if damaged. Schedule cleaning at every service interval in salt use.", partsNeeded: ["Replacement filter element (if damaged)"], estimatedTime: "15-30 minutes" },
+
+            wd_fix_leak: { id: "wd_fix_leak", type: "resolution", severity: "LOW", title: "Pressure-Side Leak", text: "Small leak on the discharge side prevents pressure from holding — pump short-cycles.", action: "Inspect every fitting from pump outlet to nozzle. Check quick-connect O-rings, hose clamp seals, and nozzle trigger. Replace O-rings or fittings as needed.", partsNeeded: ["Replacement O-rings", "Thread sealant (non-hardening)", "Replacement fittings as needed"], estimatedTime: "30-60 minutes" },
+
+            wd_fix_accumulator: { id: "wd_fix_accumulator", type: "resolution", severity: "LOW", title: "Install Accumulator Tank", text: "Small accumulator tank smooths pressure and stops short-cycling on a tight system.", action: "Install a small (0.5L–1L) accumulator tank on the pressure side near the pump. Pre-charge to ~20 PSI. This eliminates chattering and extends pump life.", partsNeeded: ["Small accumulator tank", "Tee fitting", "Hose / clamps"], estimatedTime: "45-90 minutes" },
+
+            wd_fix_short: { id: "wd_fix_short", type: "resolution", severity: "HIGH", title: "Pump Feed Shorted to 12V", text: "Pump runs with panel switch OFF — wire shorted to power.", action: "Trace the pump feed wire for chafe points. Repair with heat-shrink and protect with split loom.", partsNeeded: ["Tinned marine wire", "Heat-shrink connectors", "Split loom"], estimatedTime: "30-90 minutes" }
+        }
     }
 
 };
