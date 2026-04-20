@@ -859,10 +859,25 @@
         card.classList.toggle('expanded');
     }
 
+    var _faultSearchTimer = null;
+    function mtpBeacon(kind, data) {
+        try {
+            fetch('/api/event', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ kind: kind, data: data || null }), keepalive: true }).catch(function(){});
+        } catch(_){}
+    }
+
     function renderResults() {
         var query = document.getElementById('searchInput').value.trim().toLowerCase();
         var clearBtn = document.getElementById('searchClear');
         clearBtn.style.display = query ? 'flex' : 'none';
+
+        if (query) {
+            clearTimeout(_faultSearchTimer);
+            _faultSearchTimer = setTimeout(function(){
+                mtpBeacon('fault_lookup', { q: query.slice(0,80), brand: currentFilter, severity: currentSeverity });
+            }, 700);
+        }
 
         var filtered = faultCodes.filter(function(fc) {
             if (currentFilter !== 'all' && fc.brand !== currentFilter) return false;

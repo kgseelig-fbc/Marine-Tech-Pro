@@ -66,9 +66,17 @@
         container.innerHTML = html;
     };
 
+    function mtpBeacon(kind, data) {
+        try {
+            fetch('/api/event', { method:'POST', headers:{'Content-Type':'application/json'},
+                body: JSON.stringify({ kind: kind, data: data || null }), keepalive: true }).catch(function(){});
+        } catch(_){}
+    }
+
     function showEngine(index) {
         var eng = window.engineSpecDatabase[index];
         activeEngine = index;
+        mtpBeacon('spec_view', { engine: eng.name });
 
         var allBtns = document.querySelectorAll('.engine-pick-btn');
         for (var b = 0; b < allBtns.length; b++) {

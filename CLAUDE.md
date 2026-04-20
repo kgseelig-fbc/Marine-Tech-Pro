@@ -10,7 +10,7 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 
 - **Install dependencies:** `npm install`
 - **Run the server:** `npm start` (runs `node server.js` on port 3000)
-- **Environment variables:** `PORT`, `ACCESS_CODE` (required for login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (required for Ask-a-Tech AI feature)
+- **Environment variables:** `PORT`, `ACCESS_CODE` (tech login), `ADMIN_CODE` (admin dashboard login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (Ask-a-Tech AI), `DATA_DIR` (SQLite location — defaults to `/data` if present else `./data`), `FBC_HUB_URL` (defaults to `https://freedomboatclub.ai`), `IP_HASH_SALT`
 
 There are no tests, linter, or build step configured.
 

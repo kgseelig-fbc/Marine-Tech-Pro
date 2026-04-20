@@ -453,7 +453,19 @@
         window.__currentDiagNode = currentNodeId;
         document.getElementById('symptomPicker').style.display = 'none';
         document.getElementById('diagnosticArea').style.display = 'block';
+        mtpBeacon('tree_start', { tree: treeName });
         renderCurrentNode();
+    }
+
+    function mtpBeacon(kind, data) {
+        try {
+            fetch('/api/event', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ kind: kind, data: data || null }),
+                keepalive: true
+            }).catch(function(){});
+        } catch(_){}
     }
 
     function goToNode(nodeId) {
@@ -509,7 +521,15 @@
         }
         document.getElementById('breadcrumb').innerHTML = bcHtml;
 
-        if (node.type === 'resolution') { renderResolution(node); return; }
+        if (node.type === 'resolution') {
+            mtpBeacon('tree_resolve', {
+                tree: window.__currentDiagTree,
+                node: currentNodeId,
+                severity: node.severity || null,
+                title: node.title || null
+            });
+            renderResolution(node); return;
+        }
 
         var html = '<div class="diag-card">';
         if (node.type === 'question') {

@@ -63,7 +63,7 @@ function attemptLogin() {
     .then(function(res) { return res.json(); })
     .then(function(data) {
         if (data.success) {
-            window.location.replace('/');
+            window.location.replace(data.redirect || '/');
         } else {
             errorMsg.textContent = data.message || 'Invalid access code';
             input.classList.add('login-shake');

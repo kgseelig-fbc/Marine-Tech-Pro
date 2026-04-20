@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B2240">
+    <title>Admin — Marine Tech Pro</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/fbc-logo.jpeg">
+    <link rel="apple-touch-icon" href="/icons/fbc-logo.jpeg">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .admin-wrap { padding: 18px 16px 60px; max-width: 1100px; margin: 0 auto; }
+        .admin-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+            gap: 10px;
+            margin-bottom: 18px;
+        }
+        .stat-card {
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            border-radius: var(--r-md);
+            padding: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+        .stat-label {
+            font-size: 11px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 6px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .stat-label .icon { width: 14px; height: 14px; color: var(--fbc-navy-3); }
+        .stat-value {
+            font-size: 26px;
+            font-weight: 800;
+            color: var(--fbc-navy);
+            letter-spacing: -.02em;
+        }
+        .stat-sub {
+            font-size: 11.5px;
+            color: var(--muted-2);
+            margin-top: 2px;
+        }
+
+        .panel {
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            border-radius: var(--r-md);
+            padding: 16px 16px 14px;
+            margin-bottom: 14px;
+            box-shadow: var(--shadow-sm);
+        }
+        .panel h2 {
+            font-size: 14px;
+            font-weight: 800;
+            color: var(--fbc-navy);
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            margin-bottom: 12px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .panel h2 .icon { color: var(--fbc-cyan); }
+
+        table.mtp {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+        }
+        table.mtp th {
+            text-align: left;
+            font-size: 10.5px;
+            font-weight: 700;
+            color: var(--muted);
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            padding: 6px 10px 6px 0;
+            border-bottom: 1px solid var(--hairline);
+        }
+        table.mtp td {
+            padding: 8px 10px 8px 0;
+            border-bottom: 1px solid var(--hairline);
+            vertical-align: top;
+            color: var(--ink-2);
+        }
+        table.mtp tr:last-child td { border-bottom: none; }
+        table.mtp .mono { font-family: var(--font-mono); font-size: 12px; color: var(--muted); }
+        table.mtp .q-cell { max-width: 420px; word-wrap: break-word; }
+
+        .pill {
+            display: inline-block;
+            font-size: 10.5px;
+            font-weight: 700;
+            padding: 2px 8px;
+            border-radius: var(--r-pill);
+            background: var(--bg-2);
+            color: var(--ink-2);
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .pill.ok   { background: var(--ok-soft);     color: #0F5A2B; }
+        .pill.fail { background: var(--danger-soft); color: #8A1B20; }
+        .pill.warn { background: var(--warn-soft);   color: #6B4A10; }
+        .pill.ai   { background: var(--info-soft);   color: #174A93; }
+
+        .chart {
+            width: 100%;
+            height: 140px;
+            display: block;
+        }
+
+        .empty {
+            text-align: center;
+            padding: 28px 12px;
+            color: var(--muted);
+            font-size: 13.5px;
+        }
+
+        .top-list {
+            display: grid;
+            grid-template-columns: 1fr;
+            gap: 6px;
+        }
+        .top-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            align-items: center;
+            gap: 10px;
+            padding: 6px 10px;
+            border-radius: var(--r-sm);
+            background: var(--bg-2);
+            font-size: 13.5px;
+            color: var(--ink-2);
+        }
+        .top-row .tree-key { font-weight: 600; color: var(--fbc-navy); }
+        .top-row .n { font-weight: 800; color: var(--fbc-navy-3); }
+        .top-row .bar {
+            grid-column: 1 / -1;
+            height: 4px;
+            border-radius: 4px;
+            background: var(--fbc-cyan);
+            margin-top: 4px;
+        }
+
+        .meta-line {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+            font-size: 12px;
+            color: var(--muted);
+            margin-top: 4px;
+        }
+        .meta-line .mono { font-family: var(--font-mono); }
+
+        @media (max-width: 640px) {
+            .admin-grid { grid-template-columns: repeat(2, 1fr); }
+            .q-cell { max-width: 100%; }
+        }
+    </style>
+</head>
+<body>
+
+<header class="top-bar">
+    <a href="#" id="hubLink" class="back-link">
+        <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-arrow-left"/></svg>
+        FBC Hub
+    </a>
+    <h1>
+        <span class="brand-dot"><svg class="icon icon-sm"><use href="/icons/sprite.svg#i-gauge"/></svg></span>
+        Admin
+    </h1>
+    <button onclick="logout()" class="back-link" style="background:none;border:none;cursor:pointer;font:inherit;">
+        <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
+        Sign out
+    </button>
+</header>
+
+<div class="admin-wrap">
+
+    <div class="meta-line" id="metaLine">Loading…</div>
+
+    <section class="admin-grid" id="statGrid"></section>
+
+    <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-gauge"/></svg> Activity — last 48 hours</h2>
+        <svg class="chart" id="chart" viewBox="0 0 800 160" preserveAspectRatio="none"></svg>
+        <div class="meta-line" style="margin-top:10px;">
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--fbc-navy);border-radius:2px;margin-right:4px;"></span>Logins</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--fbc-cyan);border-radius:2px;margin-right:4px;"></span>Tree starts</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--warn);border-radius:2px;margin-right:4px;"></span>Fault lookups</span>
+            <span><span style="display:inline-block;width:10px;height:10px;background:var(--fbc-red);border-radius:2px;margin-right:4px;"></span>AI asks</span>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-wrench"/></svg> Top diagnostic trees (all time)</h2>
+        <div class="top-list" id="topTrees"></div>
+    </section>
+
+    <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-ai"/></svg> Recent AI questions</h2>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="aiTable">
+                <thead><tr>
+                    <th>Time</th>
+                    <th>Question</th>
+                    <th>Context</th>
+                    <th>Tokens</th>
+                    <th>Lat.</th>
+                    <th>OK</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-alert"/></svg> Errors &amp; failed logins</h2>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="errTable">
+                <thead><tr><th>Time</th><th>Kind</th><th>Detail</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-chat"/></svg> Recent activity</h2>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="evTable">
+                <thead><tr><th>Time</th><th>Kind</th><th>IP</th><th>Detail</th></tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
+</div>
+
+<script>
+function logout() {
+    fetch('/api/logout', { method: 'POST' }).then(function() { window.location.replace('/login'); });
+}
+
+function fmtTime(ts) {
+    var d = new Date(ts);
+    var now = Date.now();
+    var diff = Math.floor((now - ts) / 1000);
+    if (diff < 60) return diff + 's ago';
+    if (diff < 3600) return Math.floor(diff/60) + 'm ago';
+    if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
+    return d.toLocaleString();
+}
+function esc(s) {
+    if (s == null) return '';
+    return String(s).replace(/[&<>"']/g, function(c){
+        return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[c];
+    });
+}
+
+function stat(label, value, sub, iconId) {
+    return '<div class="stat-card">'
+         + '<div class="stat-label">'
+         + (iconId ? '<svg class="icon"><use href="/icons/sprite.svg#' + iconId + '"/></svg>' : '')
+         + esc(label) + '</div>'
+         + '<div class="stat-value">' + esc(value) + '</div>'
+         + (sub ? '<div class="stat-sub">' + esc(sub) + '</div>' : '')
+         + '</div>';
+}
+
+function drawChart(activity) {
+    var svg = document.getElementById('chart');
+    if (!activity || activity.length === 0) {
+        svg.innerHTML = '<text x="400" y="80" text-anchor="middle" fill="#8A98AE" font-size="13">No activity yet</text>';
+        return;
+    }
+    var W = 800, H = 160, padL = 30, padR = 10, padT = 10, padB = 24;
+    var innerW = W - padL - padR, innerH = H - padT - padB;
+    var max = 1;
+    activity.forEach(function(r){
+        max = Math.max(max, r.logins, r.trees, r.faults, r.ai);
+    });
+    var step = innerW / activity.length;
+    var bw = Math.max(1.5, step / 5);
+
+    var bars = '';
+    activity.forEach(function(r, i){
+        var x = padL + i * step;
+        var series = [
+            { v: r.logins, c: '#0B2240' },
+            { v: r.trees,  c: '#2AB7D1' },
+            { v: r.faults, c: '#E08E1F' },
+            { v: r.ai,     c: '#E41E2B' }
+        ];
+        series.forEach(function(s, k){
+            if (s.v <= 0) return;
+            var h = (s.v / max) * innerH;
+            var y = padT + innerH - h;
+            bars += '<rect x="' + (x + k * (bw + 0.5)) + '" y="' + y + '" width="' + bw + '" height="' + h + '" fill="' + s.c + '" rx="1"/>';
+        });
+    });
+
+    var ticks = '';
+    for (var g = 0; g <= 3; g++) {
+        var y = padT + (innerH * g / 3);
+        var v = Math.round(max * (1 - g / 3));
+        ticks += '<line x1="' + padL + '" y1="' + y + '" x2="' + (W - padR) + '" y2="' + y + '" stroke="#E4E8EF" stroke-width="1"/>';
+        ticks += '<text x="' + (padL - 4) + '" y="' + (y + 3) + '" text-anchor="end" font-size="10" fill="#8A98AE">' + v + '</text>';
+    }
+
+    var xLabels = '';
+    var first = new Date(activity[0].hour);
+    var last = new Date(activity[activity.length - 1].hour);
+    xLabels += '<text x="' + padL + '" y="' + (H - 6) + '" font-size="10" fill="#8A98AE">' + first.toLocaleString([], { month:'short', day:'numeric', hour:'numeric' }) + '</text>';
+    xLabels += '<text x="' + (W - padR) + '" y="' + (H - 6) + '" text-anchor="end" font-size="10" fill="#8A98AE">' + last.toLocaleString([], { month:'short', day:'numeric', hour:'numeric' }) + '</text>';
+
+    svg.innerHTML = ticks + bars + xLabels;
+}
+
+function renderTopTrees(rows) {
+    var el = document.getElementById('topTrees');
+    if (!rows.length) { el.innerHTML = '<div class="empty">No tree starts yet.</div>'; return; }
+    var max = rows[0].count || 1;
+    el.innerHTML = rows.map(function(r){
+        var pct = Math.max(6, Math.round(r.count / max * 100));
+        return '<div class="top-row">'
+             + '<div class="tree-key">' + esc((r.tree || 'unknown').replace(/_/g,' ')) + '</div>'
+             + '<div class="n">' + r.count + '</div>'
+             + '<div class="bar" style="width:' + pct + '%;"></div>'
+             + '</div>';
+    }).join('');
+}
+
+function renderAi(rows) {
+    var tbody = document.querySelector('#aiTable tbody');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No AI questions yet.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(function(r){
+        var ctx = r.ctx_tree ? esc(r.ctx_tree) + (r.ctx_node ? ' / ' + esc(r.ctx_node) : '') : '<span class="mono">—</span>';
+        var tokens = (r.tokens_in || 0) + ' / ' + (r.tokens_out || 0);
+        return '<tr>'
+             + '<td class="mono">' + fmtTime(r.ts) + '</td>'
+             + '<td class="q-cell">' + esc(r.question) + '</td>'
+             + '<td>' + ctx + '</td>'
+             + '<td class="mono">' + tokens + '</td>'
+             + '<td class="mono">' + (r.duration_ms ? r.duration_ms + 'ms' : '—') + '</td>'
+             + '<td>' + (r.ok ? '<span class="pill ok">ok</span>' : '<span class="pill fail">fail</span>') + '</td>'
+             + '</tr>';
+    }).join('');
+}
+
+function renderErrors(rows) {
+    var tbody = document.querySelector('#errTable tbody');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="3" class="empty">No errors. 👍</td></tr>'; return; }
+    tbody.innerHTML = rows.map(function(r){
+        var pillCls = r.kind === 'login_fail' ? 'warn' : 'fail';
+        return '<tr>'
+             + '<td class="mono">' + fmtTime(r.ts) + '</td>'
+             + '<td><span class="pill ' + pillCls + '">' + esc(r.kind) + '</span></td>'
+             + '<td class="mono">' + esc(r.data || '') + '</td>'
+             + '</tr>';
+    }).join('');
+}
+
+function renderEvents(rows) {
+    var tbody = document.querySelector('#evTable tbody');
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="4" class="empty">No activity yet.</td></tr>'; return; }
+    tbody.innerHTML = rows.map(function(r){
+        var short = '';
+        try {
+            if (r.data) {
+                var d = JSON.parse(r.data);
+                short = Object.keys(d).slice(0,3).map(function(k){ return k+'='+String(d[k]).slice(0,40); }).join(' · ');
+            }
+        } catch(_){ short = r.data || ''; }
+        var pillCls = r.kind.indexOf('error') > -1 || r.kind === 'login_fail' ? 'fail'
+                    : r.kind === 'ai_ask' || r.kind === 'ai_open' ? 'ai'
+                    : r.kind.indexOf('login') > -1 ? 'ok' : '';
+        return '<tr>'
+             + '<td class="mono">' + fmtTime(r.ts) + '</td>'
+             + '<td><span class="pill ' + pillCls + '">' + esc(r.kind) + '</span></td>'
+             + '<td class="mono">' + esc(r.ip_hash || '') + '</td>'
+             + '<td class="mono">' + esc(short) + '</td>'
+             + '</tr>';
+    }).join('');
+}
+
+function renderStats(s) {
+    var g = document.getElementById('statGrid');
+    g.innerHTML =
+          stat('Logins (24h)',       s.last24h.logins,       s.last24h.loginFail + ' failed',     'i-lock')
+        + stat('Unique users (24h)', s.last24h.uniqueUsers,  s.last7d.uniqueUsers + ' past 7d',    'i-home')
+        + stat('Diagnostics (24h)',  s.last24h.treeStarts,   s.last7d.treeStarts + ' past 7d',     'i-wrench')
+        + stat('Fault lookups (24h)',s.last24h.faultLookups, '',                                   'i-alert')
+        + stat('AI asks (24h)',      s.last24h.aiAsks,       s.last7d.aiAsks + ' past 7d',         'i-ai')
+        + stat('Total events',       s.total.events,         s.total.aiMessages + ' AI messages',  'i-gauge');
+}
+
+function load() {
+    fetch('/api/admin/overview')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.success) throw new Error('not ok');
+            document.getElementById('hubLink').href = d.hubUrl || 'https://freedomboatclub.ai';
+            document.getElementById('metaLine').innerHTML =
+                  '<span>Build <span class="mono">' + esc(d.build) + '</span></span>'
+                + '<span>Started <span class="mono">' + esc(new Date(d.startedAt).toLocaleString()) + '</span></span>';
+            renderStats(d.summary);
+            drawChart(d.activity);
+            renderTopTrees(d.topTrees);
+            renderAi(d.recentAi);
+            renderErrors(d.errors);
+            renderEvents(d.recentEvents);
+        })
+        .catch(function(e){
+            document.getElementById('metaLine').textContent = 'Failed to load. Refresh.';
+            console.error(e);
+        });
+}
+
+load();
+setInterval(load, 30000);
+</script>
+</body>
+</html>

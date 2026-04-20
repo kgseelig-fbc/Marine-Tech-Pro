@@ -6,11 +6,14 @@ const crypto = require('crypto');
 const path = require('path');
 const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
+const datastore = require('./lib/db');
 
 const app = express();
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
 const ACCESS_CODE = process.env.ACCESS_CODE || '';
+const ADMIN_CODE = process.env.ADMIN_CODE || '';
+const FBC_HUB_URL = process.env.FBC_HUB_URL || 'https://freedomboatclub.ai';
 
 // Determine session secret
 let sessionSecret = process.env.SESSION_SECRET;
@@ -72,6 +75,15 @@ app.use(session({
     proxy: true
 }));
 
+// Helpers
+function reqMeta(req) {
+    return {
+        session_id: req.sessionID ? req.sessionID.slice(0, 16) : null,
+        ip: req.ip,
+        ua: req.get('user-agent') || null
+    };
+}
+
 // --- PUBLIC ROUTES (no auth required) ---
 
 // Health / version — public so monitoring can hit it.
@@ -83,34 +95,43 @@ app.get('/api/health', (req, res) => {
 
 // Login page
 app.get('/login', (req, res) => {
-    if (req.session.authenticated) return res.redirect('/');
+    if (req.session.authenticated) return res.redirect(req.session.admin ? '/admin' : '/');
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
 // Login API (with login-specific rate limiting)
 app.post('/api/login', loginLimiter, (req, res) => {
     const password = (req.body.password || '').trim();
+    const meta = reqMeta(req);
 
-    if (!ACCESS_CODE) {
+    if (!ACCESS_CODE && !ADMIN_CODE) {
         return res.json({ success: false, message: 'Server access code not configured' });
     }
 
-    if (password === ACCESS_CODE) {
-        // Regenerate session to prevent session fixation
+    const isAdmin = !!ADMIN_CODE && password === ADMIN_CODE;
+    const isTech  = !!ACCESS_CODE && password === ACCESS_CODE;
+
+    if (isAdmin || isTech) {
         req.session.regenerate((err) => {
             if (err) {
+                datastore.logEvent('error', { ...meta, data: { where: 'regenerate', msg: err.message } });
                 return res.json({ success: false, message: 'Session error' });
             }
             req.session.authenticated = true;
-            return res.json({ success: true });
+            req.session.admin = isAdmin;
+            datastore.logEvent(isAdmin ? 'login_ok_admin' : 'login_ok', { ...reqMeta(req) });
+            return res.json({ success: true, admin: isAdmin, redirect: isAdmin ? '/admin' : '/' });
         });
     } else {
+        datastore.logEvent('login_fail', { ...meta });
         res.json({ success: false, message: 'Invalid access code' });
     }
 });
 
 // Logout API
 app.post('/api/logout', (req, res) => {
+    const meta = reqMeta(req);
+    datastore.logEvent('logout', meta);
     req.session.destroy(() => {
         res.redirect('/login');
     });
@@ -131,9 +152,55 @@ app.use('/icons', express.static(path.join(__dirname, 'public', 'icons'), static
 
 // --- AUTH MIDDLEWARE (protects everything below) ---
 
-app.use((req, res, next) => {
+function requireAuth(req, res, next) {
     if (req.session.authenticated) return next();
     res.redirect('/login');
+}
+function requireAdmin(req, res, next) {
+    if (req.session.authenticated && req.session.admin) return next();
+    if (req.xhr || req.get('accept') === 'application/json') {
+        return res.status(403).json({ success: false, message: 'Admin only' });
+    }
+    res.redirect('/login');
+}
+
+app.use(requireAuth);
+
+// --- ADMIN ROUTES (must come before the generic static handler) ---
+
+app.get('/admin', requireAdmin, (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'admin.html'));
+});
+
+app.get('/api/admin/overview', requireAdmin, (req, res) => {
+    res.json({
+        success: true,
+        build: BUILD_SHA,
+        startedAt: BUILD_TIME,
+        hubUrl: FBC_HUB_URL,
+        summary: datastore.getSummary(),
+        activity: datastore.getActivityByHour(48),
+        topTrees: datastore.getTopTrees(12),
+        recentAi: datastore.getRecentAi(25),
+        recentEvents: datastore.getRecentEvents(40),
+        errors: datastore.getErrors(25)
+    });
+});
+
+// --- CLIENT BEACON ---
+// Small endpoint the frontend calls to log tree navigations and fault lookups.
+// Authenticated only — no anonymous writes.
+const beaconLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders: true, legacyHeaders: false });
+app.post('/api/event', beaconLimiter, (req, res) => {
+    const kind = (req.body.kind || '').toString().slice(0, 48);
+    const data = req.body.data && typeof req.body.data === 'object' ? req.body.data : null;
+    const ALLOWED = new Set([
+        'tree_start', 'tree_complete', 'tree_resolve', 'fault_lookup',
+        'spec_view', 'ai_open', 'ai_close', 'error'
+    ]);
+    if (!ALLOWED.has(kind)) return res.status(400).json({ success: false });
+    datastore.logEvent(kind, { ...reqMeta(req), data });
+    res.json({ success: true });
 });
 
 // --- PROTECTED STATIC FILES ---
@@ -141,8 +208,9 @@ app.use((req, res, next) => {
 // all other assets are only accessible after authentication.
 app.use(express.static(path.join(__dirname, 'public'), staticOpts));
 
-// Root serves index.html
+// Root serves index.html (techs) or /admin for admins.
 app.get('/', (req, res) => {
+    if (req.session.admin) return res.redirect('/admin');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -166,7 +234,7 @@ const SYSTEM_INSTRUCTIONS = `You are Marine Tech Pro's AI assistant for Freedom 
 
 Your job: answer diagnostic and repair questions from a tech in the field, on a phone, often next to a running engine. Be direct. Use short sentences and bulleted steps. Skip pleasantries.
 
-Ground your answers in the knowledge base below (diagnostic trees, engine specs, fault codes). When the KB has a relevant tree or spec, cite it by name. When the KB does not cover a topic (e.g., bilge pumps, livewell pumps, washdown, fresh water, hydraulic steering purge, NMEA 2000, galvanic corrosion), answer from general marine-tech best practice and say so plainly.
+Ground your answers in the knowledge base below (diagnostic trees, engine specs, fault codes). When the KB has a relevant tree or spec, cite it by name. When the KB does not cover a topic (e.g., fresh water, hydraulic steering purge, NMEA 2000, galvanic corrosion), answer from general marine-tech best practice and say so plainly.
 
 Safety: if the question involves fuel, electrical, or running the engine out of water, lead with the one safety step that matters most. Do not pad with generic PPE reminders.
 
@@ -183,7 +251,11 @@ const askLimiter = rateLimit({
 });
 
 app.post('/api/ask', askLimiter, async (req, res) => {
+    const meta = reqMeta(req);
+    const started = Date.now();
+
     if (!anthropicClient) {
+        datastore.logEvent('ai_error', { ...meta, data: { reason: 'no_api_key' } });
         return res.status(503).json({ success: false, message: 'AI assistant not configured (ANTHROPIC_API_KEY missing).' });
     }
     const question = (req.body.question || '').toString().trim();
@@ -212,13 +284,36 @@ app.post('/api/ask', askLimiter, async (req, res) => {
             ]
         });
         const answer = msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
+        const usage = msg.usage || {};
+        datastore.logAi({
+            ...meta,
+            question, answer,
+            ctx_tree: ctx.tree || null,
+            ctx_node: ctx.node || null,
+            tokens_in: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
+            tokens_out: usage.output_tokens || 0,
+            duration_ms: Date.now() - started,
+            ok: true
+        });
         res.json({ success: true, answer });
     } catch (err) {
         console.error('Ask error:', err.message);
+        datastore.logAi({
+            ...meta,
+            question,
+            ctx_tree: ctx.tree || null,
+            ctx_node: ctx.node || null,
+            duration_ms: Date.now() - started,
+            ok: false,
+            error: err.message
+        });
+        datastore.logEvent('ai_error', { ...meta, data: { msg: err.message } });
         res.status(500).json({ success: false, message: 'AI request failed. Try again.' });
     }
 });
 
 app.listen(PORT, () => {
     console.log(`Marine Tech Pro running on port ${PORT}`);
+    console.log(`DB at ${datastore.DB_PATH}`);
+    if (!ADMIN_CODE) console.warn('WARNING: ADMIN_CODE not set — /admin dashboard unreachable.');
 });
