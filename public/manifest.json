@@ -1,0 +1,14 @@
+{
+  "name": "Marine Tech Pro",
+  "short_name": "Tech Pro",
+  "description": "Freedom Boat Club field diagnostic and repair assistant",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B2240",
+  "theme_color": "#0B2240",
+  "orientation": "portrait",
+  "icons": [
+    { "src": "/icons/fbc-logo.jpeg", "sizes": "192x192", "type": "image/jpeg" },
+    { "src": "/icons/fbc-logo.jpeg", "sizes": "512x512", "type": "image/jpeg" }
+  ]
+}

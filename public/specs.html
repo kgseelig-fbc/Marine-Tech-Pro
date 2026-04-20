@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B2240">
     <title>Engine Specs — Marine Tech Pro</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/fbc-logo.jpeg">
+    <link rel="apple-touch-icon" href="/icons/fbc-logo.jpeg">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css">
     <style>
         .top-bar-logo {
             width: 32px;
@@ -22,8 +25,14 @@
 
     <!-- TOP BAR -->
     <header class="top-bar">
-        <a href="index.html" class="back-link">← Home</a>
-        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Engine Specs</h1>
+        <a href="index.html" class="back-link">
+            <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-arrow-left"/></svg>
+            Home
+        </a>
+        <h1>
+            <span class="brand-dot"><svg class="icon icon-sm"><use href="/icons/sprite.svg#i-book"/></svg></span>
+            Engine Specs
+        </h1>
         <span style="width:60px"></span>
     </header>
 

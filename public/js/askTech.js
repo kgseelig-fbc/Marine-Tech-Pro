@@ -10,25 +10,27 @@
     function mount() {
         if (document.getElementById('ask-fab')) return;
 
+        var SP = '/icons/sprite.svg';
+
         var fab = document.createElement('button');
         fab.id = 'ask-fab';
         fab.type = 'button';
         fab.setAttribute('aria-label', 'Ask a tech question');
-        fab.textContent = '💬';
+        fab.innerHTML = '<svg class="icon"><use href="' + SP + '#i-chat"/></svg>';
 
         var overlay = document.createElement('div');
         overlay.id = 'ask-overlay';
         overlay.innerHTML = ''
             + '<div id="ask-panel">'
             + '  <div id="ask-header">'
-            + '    <div id="ask-title">Ask a Tech</div>'
-            + '    <button id="ask-close" type="button" aria-label="Close">×</button>'
+            + '    <div id="ask-title"><svg class="icon"><use href="' + SP + '#i-ai"/></svg> Ask a Tech</div>'
+            + '    <button id="ask-close" type="button" aria-label="Close"><svg class="icon"><use href="' + SP + '#i-close"/></svg></button>'
             + '  </div>'
             + '  <div id="ask-conversation"></div>'
             + '  <div id="ask-input-row">'
-            + '    <button id="ask-mic" type="button" aria-label="Voice input" title="Hold to speak">🎤</button>'
+            + '    <button id="ask-mic" type="button" aria-label="Voice input" title="Tap to speak"><svg class="icon"><use href="' + SP + '#i-mic"/></svg></button>'
             + '    <textarea id="ask-input" rows="1" placeholder="Ask anything — e.g. How do I purge air from hydraulic steering?"></textarea>'
-            + '    <button id="ask-send" type="button">Send</button>'
+            + '    <button id="ask-send" type="button" aria-label="Send"><svg class="icon"><use href="' + SP + '#i-send"/></svg></button>'
             + '  </div>'
             + '  <div id="ask-hint">Answers from Marine Tech Pro AI. Verify critical specs against OEM manual.</div>'
             + '</div>';
@@ -104,7 +106,6 @@
                 recognizer.start();
                 listening = true;
                 micBtn.classList.add('listening');
-                micBtn.textContent = '⏹';
             } catch (err) {
                 console.warn('Could not start speech recognition:', err);
                 listening = false;
@@ -118,7 +119,6 @@
             }
             listening = false;
             micBtn.classList.remove('listening');
-            micBtn.textContent = '🎤';
         }
 
         // --- READ-ALOUD (SpeechSynthesis) ---
@@ -184,8 +184,8 @@
                         // Add small "speak" button
                         var btn = document.createElement('button');
                         btn.type = 'button';
-                        btn.textContent = '🔊 Read aloud';
-                        btn.style.cssText = 'margin-top:8px;background:none;border:1px solid #ccc;border-radius:6px;padding:4px 10px;font-size:12px;cursor:pointer;color:#555;';
+                        btn.innerHTML = '<svg class="icon icon-sm" style="vertical-align:-4px;margin-right:4px"><use href="' + SP + '#i-speaker"/></svg>Read aloud';
+                        btn.style.cssText = 'margin-top:8px;background:none;border:1px solid var(--hairline);border-radius:8px;padding:6px 12px;font-size:12.5px;font-weight:600;cursor:pointer;color:var(--muted);';
                         btn.addEventListener('click', function () { speak(res.body.answer); });
                         msg.appendChild(document.createElement('br'));
                         msg.appendChild(btn);

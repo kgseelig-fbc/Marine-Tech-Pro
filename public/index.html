@@ -2,70 +2,87 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Marine Tech Pro</title>
-    <link rel="manifest" href="manifest.json">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B2240">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="css/styles.css">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <title>Marine Tech Pro — Freedom Boat Club</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/fbc-logo.jpeg">
+    <link rel="apple-touch-icon" href="/icons/fbc-logo.jpeg">
+    <link rel="stylesheet" href="/css/styles.css">
 </head>
 <body>
-    <!-- HEADER -->
+
     <header class="home-header">
-        <img src="icons/fbc-logo.jpeg" alt="Freedom Boat Club" style="width:90px; height:90px; border-radius:50%; object-fit:cover; margin-bottom:10px;">
+        <div class="brand-mark">
+            <img src="/icons/fbc-logo.jpeg" alt="Freedom Boat Club">
+        </div>
         <h1>Marine Tech Pro</h1>
-        <p>Field Diagnostic &amp; Repair Assistant</p>
+        <p>Field diagnostic &amp; repair assistant</p>
+        <span class="ai-chip">
+            <svg class="icon"><use href="/icons/sprite.svg#i-ai"/></svg>
+            AI-Powered
+        </span>
     </header>
-    <!-- MAIN CONTENT -->
-    <main>
-        <!-- Status Bar -->
+
+    <main class="home-main">
+
         <div class="status-bar">
             <div class="status-item">
-                <span class="status-icon">🔧</span>
+                <svg class="icon"><use href="/icons/sprite.svg#i-engine"/></svg>
                 <span class="status-label">Mercury &amp; Yamaha</span>
             </div>
             <div class="status-divider"></div>
             <div class="status-item">
-                <span class="status-icon">⚙️</span>
-                <span class="status-label">4-Stroke 115-300 HP</span>
+                <svg class="icon"><use href="/icons/sprite.svg#i-gauge"/></svg>
+                <span class="status-label">4-Stroke 115–300 HP</span>
             </div>
         </div>
-        <!-- Menu Buttons -->
+
         <a href="diagnose.html" class="menu-card">
-            <div class="menu-icon red">🔍</div>
+            <div class="menu-icon navy"><svg class="icon"><use href="/icons/sprite.svg#i-wrench"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Start Diagnosis</div>
-                <div class="menu-subtitle">Guided troubleshooting — engine, electrical, electronics</div>
+                <div class="menu-subtitle">Guided troubleshooting for engine, electrical &amp; systems</div>
             </div>
-            <span class="menu-arrow">›</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </a>
+
         <a href="fault-codes.html" class="menu-card">
-            <div class="menu-icon orange">⚠️</div>
+            <div class="menu-icon orange"><svg class="icon"><use href="/icons/sprite.svg#i-alert"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Fault Code Lookup</div>
                 <div class="menu-subtitle">Mercury SmartCraft &amp; Yamaha DTC codes</div>
             </div>
-            <span class="menu-arrow">›</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </a>
+
         <a href="specs.html" class="menu-card">
-            <div class="menu-icon blue">📘</div>
+            <div class="menu-icon blue"><svg class="icon"><use href="/icons/sprite.svg#i-book"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Engine Specs &amp; Reference</div>
-                <div class="menu-subtitle">Pressures, resistances, torque values, maintenance</div>
+                <div class="menu-subtitle">Pressures, resistances, torque values, service data</div>
             </div>
-            <span class="menu-arrow">›</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </a>
-        <!-- Safety Reminder -->
+
         <div class="safety-banner">
-            🛡️ <strong>Safety First:</strong> Kill switch OFF before electrical work.
-            PPE required. Fire extinguisher accessible for fuel system work.
+            <svg class="icon"><use href="/icons/sprite.svg#i-shield"/></svg>
+            <div>
+                <strong>Safety first.</strong> Kill switch off before electrical work. PPE required. Fire extinguisher accessible for fuel work.
+            </div>
         </div>
-        <!-- Logout Button -->
-        <div style="text-align:center; margin-top:30px; padding-bottom:20px;">
-            <button onclick="logoutMTP()" style="padding:10px 24px; background:none; border:1px solid #ddd; color:#95a5a6; border-radius:8px; font-size:13px; cursor:pointer;">
-                🔒 Log Out
+
+        <div style="text-align:center; margin-top:26px;">
+            <button onclick="logoutMTP()" class="btn btn-ghost-dark">
+                <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
+                Log out
             </button>
         </div>
+
     </main>
+
     <script>
     function logoutMTP() {
         fetch('/api/logout', { method: 'POST' }).then(function() {
@@ -73,6 +90,6 @@
         });
     }
     </script>
-    <script src="js/askTech.js"></script>
+    <script src="/js/askTech.js"></script>
 </body>
 </html>

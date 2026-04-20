@@ -2,11 +2,14 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B2240">
     <title>Diagnosis — Marine Tech Pro</title>
-    <link rel="manifest" href="manifest.json">
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/fbc-logo.jpeg">
+    <link rel="apple-touch-icon" href="/icons/fbc-logo.jpeg">
     <meta name="apple-mobile-web-app-capable" content="yes">
-    <link rel="stylesheet" href="css/styles.css">
+    <link rel="stylesheet" href="/css/styles.css">
     <style>
         .top-bar-logo {
             width: 32px;
@@ -281,8 +284,14 @@
 
     <!-- TOP BAR -->
     <header class="top-bar">
-        <a href="index.html" class="back-link">&#8592; Home</a>
-        <h1><img src="icons/fbc-logo.jpeg" alt="FBC" class="top-bar-logo">Diagnosis</h1>
+        <a href="index.html" class="back-link">
+            <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-arrow-left"/></svg>
+            Home
+        </a>
+        <h1>
+            <span class="brand-dot"><svg class="icon icon-sm"><use href="/icons/sprite.svg#i-wrench"/></svg></span>
+            Diagnosis
+        </h1>
         <span style="width:60px"></span>
     </header>
 
@@ -294,121 +303,123 @@
         <div class="category-header">Engine</div>
 
         <div class="menu-card" onclick="beginTree('engine_no_start')">
-            <div class="menu-icon red">&#128683;</div>
+            <div class="menu-icon redSoft"><svg class="icon"><use href="/icons/sprite.svg#i-engine"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Engine Won't Start</div>
                 <div class="menu-subtitle">No crank, cranks but won't fire, slow crank</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="menu-card" onclick="beginTree('engine_overheat')">
-            <div class="menu-icon orange">&#127777;&#65039;</div>
+            <div class="menu-icon orange"><svg class="icon"><use href="/icons/sprite.svg#i-thermometer"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Overheating</div>
                 <div class="menu-subtitle">Overheat alarm, high temp, no tell-tale</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="menu-card" onclick="beginTree('engine_runs_rough')">
-            <div class="menu-icon orange">&#128243;</div>
+            <div class="menu-icon orange"><svg class="icon"><use href="/icons/sprite.svg#i-spark"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Runs Rough / Misfires</div>
                 <div class="menu-subtitle">Vibration, stumble, poor performance</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="category-header">Electrical</div>
 
         <div class="menu-card" onclick="beginTree('charging_electrical')">
-            <div class="menu-icon orange">&#128267;</div>
+            <div class="menu-icon orange"><svg class="icon"><use href="/icons/sprite.svg#i-battery"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Charging / Battery Issues</div>
                 <div class="menu-subtitle">Dead battery, not charging, low voltage</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="category-header">Steering &amp; Trim</div>
 
         <div class="menu-card" onclick="beginTree('trim_steering')">
-            <div class="menu-icon blue">&#128260;</div>
+            <div class="menu-icon blue"><svg class="icon"><use href="/icons/sprite.svg#i-steering"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Trim &amp; Steering Problems</div>
                 <div class="menu-subtitle">Trim inop, steering stiff, hydraulic issues</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="category-header">Electronics</div>
 
         <div class="menu-card" onclick="beginTree('electronics')">
-            <div class="menu-icon purple">&#128225;</div>
+            <div class="menu-icon purple"><svg class="icon"><use href="/icons/sprite.svg#i-radio"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Electronics / MFD / Gauges</div>
                 <div class="menu-subtitle">No display, no data, NMEA network problems</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="category-header">Accessories</div>
 
         <div class="menu-card" onclick="beginTree('stereo_audio')">
-            <div class="menu-icon purple">&#128266;</div>
+            <div class="menu-icon purple"><svg class="icon"><use href="/icons/sprite.svg#i-speaker"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Stereo / Audio System</div>
                 <div class="menu-subtitle">No sound, distortion, Bluetooth, amp problems</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="category-header">Safety Equipment</div>
 
         <div class="menu-card" onclick="beginTree('nav_lights')">
-            <div class="menu-icon green">&#128161;</div>
+            <div class="menu-icon green"><svg class="icon"><use href="/icons/sprite.svg#i-lightbulb"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Navigation Lights</div>
                 <div class="menu-subtitle">Lights out, dim, flickering</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="menu-card" onclick="beginTree('horn_system')">
-            <div class="menu-icon green">&#128226;</div>
+            <div class="menu-icon green"><svg class="icon"><use href="/icons/sprite.svg#i-horn"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Horn Not Working</div>
                 <div class="menu-subtitle">Dead horn, weak, stuck on</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
+        <div class="category-header">Pumps &amp; Plumbing</div>
+
         <div class="menu-card" onclick="beginTree('bilge_pump')">
-            <div class="menu-icon blue">&#128167;</div>
+            <div class="menu-icon cyan"><svg class="icon"><use href="/icons/sprite.svg#i-droplet"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Bilge Pump</div>
                 <div class="menu-subtitle">Won't run, runs always, no flow, float switch</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="menu-card" onclick="beginTree('livewell_pump')">
-            <div class="menu-icon blue">&#128031;</div>
+            <div class="menu-icon cyan"><svg class="icon"><use href="/icons/sprite.svg#i-fish"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Livewell Pump</div>
                 <div class="menu-subtitle">No flow, won't hold water, aerator weak</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
         <div class="menu-card" onclick="beginTree('washdown_pump')">
-            <div class="menu-icon blue">&#128704;</div>
+            <div class="menu-icon cyan"><svg class="icon"><use href="/icons/sprite.svg#i-spray"/></svg></div>
             <div class="menu-text">
                 <div class="menu-title">Washdown Pump</div>
                 <div class="menu-subtitle">No pressure, chattering, won't prime</div>
             </div>
-            <span class="menu-arrow">&#8250;</span>
+            <span class="menu-arrow"><svg class="icon"><use href="/icons/sprite.svg#i-chevron"/></svg></span>
         </div>
 
     </div>
