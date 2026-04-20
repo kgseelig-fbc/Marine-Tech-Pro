@@ -74,6 +74,13 @@ app.use(session({
 
 // --- PUBLIC ROUTES (no auth required) ---
 
+// Health / version — public so monitoring can hit it.
+const BUILD_SHA = (process.env.RAILWAY_GIT_COMMIT_SHA || process.env.GIT_SHA || 'dev').slice(0, 7);
+const BUILD_TIME = new Date().toISOString();
+app.get('/api/health', (req, res) => {
+    res.json({ status: 'ok', build: BUILD_SHA, startedAt: BUILD_TIME });
+});
+
 // Login page
 app.get('/login', (req, res) => {
     if (req.session.authenticated) return res.redirect('/');
@@ -111,8 +118,16 @@ app.post('/api/logout', (req, res) => {
 
 // --- SERVE TRULY PUBLIC STATIC ASSETS (CSS, icons only) ---
 // These are non-sensitive and needed for the login page to render properly.
-app.use('/css', express.static(path.join(__dirname, 'public', 'css')));
-app.use('/icons', express.static(path.join(__dirname, 'public', 'icons')));
+// Short cache so deploys pick up quickly on techs' phones.
+const staticOpts = {
+    setHeaders: (res, filePath) => {
+        if (/\.(html|js|css)$/i.test(filePath)) {
+            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+        }
+    }
+};
+app.use('/css', express.static(path.join(__dirname, 'public', 'css'), staticOpts));
+app.use('/icons', express.static(path.join(__dirname, 'public', 'icons'), staticOpts));
 
 // --- AUTH MIDDLEWARE (protects everything below) ---
 
@@ -124,7 +139,7 @@ app.use((req, res, next) => {
 // --- PROTECTED STATIC FILES ---
 // JS data files (diagnosticTrees.js, engineSpecs.js, faultcodes.js) and
 // all other assets are only accessible after authentication.
-app.use(express.static(path.join(__dirname, 'public')));
+app.use(express.static(path.join(__dirname, 'public'), staticOpts));
 
 // Root serves index.html
 app.get('/', (req, res) => {
