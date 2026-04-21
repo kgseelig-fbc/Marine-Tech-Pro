@@ -1,5 +1,6 @@
 const express = require('express');
 const session = require('express-session');
+const SqliteStore = require('better-sqlite3-session-store')(session);
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const crypto = require('crypto');
@@ -61,8 +62,13 @@ const loginLimiter = rateLimit({
 app.use(express.urlencoded({ extended: true }));
 app.use(express.json());
 
-// Session config
+// Session config — persists to SQLite on the same volume as the app DB so
+// sessions survive redeploys and don't leak memory.
 app.use(session({
+    store: new SqliteStore({
+        client: datastore.db,
+        expired: { clear: true, intervalMs: 15 * 60 * 1000 }
+    }),
     secret: sessionSecret,
     resave: false,
     saveUninitialized: false,
