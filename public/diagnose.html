@@ -278,6 +278,26 @@
             margin-top: 20px;
             margin-bottom: 10px;
         }
+
+        .diag-ai-explain {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 14px;
+            padding: 8px 14px;
+            background: #eef4ff;
+            color: #1a3a5c;
+            border: 1px solid #cfdcff;
+            border-radius: 20px;
+            font-size: 13px;
+            font-weight: 700;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        }
+        .diag-ai-explain:active { background: #dbe6ff; border-color: #b4c7ff; }
+        .diag-ai-explain .icon { color: #2980b9; }
     </style>
 </head>
 <body>
@@ -552,6 +572,10 @@
             }
             html += '</div>';
         }
+        html += '<button class="diag-ai-explain" onclick="explainStep()" type="button">'
+              + '<svg class="icon icon-sm"><use href="/icons/sprite.svg#i-ai"/></svg>'
+              + 'Explain this step'
+              + '</button>';
         if (node.options && node.options.length > 0) {
             html += '<div class="options-label">What did you find?</div>';
             for (var o = 0; o < node.options.length; o++) {
@@ -598,11 +622,45 @@
             html += '<div class="resolution-section-label">Estimated Time</div>';
             html += '<div class="resolution-action">' + node.estimatedTime + '</div>';
         }
-        html += '<div style="margin-top:20px;">';
+        html += '<div style="margin-top:16px;">';
+        html += '<button class="diag-ai-explain" onclick="explainStep()" type="button">'
+              + '<svg class="icon icon-sm"><use href="/icons/sprite.svg#i-ai"/></svg>'
+              + 'Why this fix?'
+              + '</button>';
+        html += '</div>';
+        html += '<div style="margin-top:12px;">';
         html += '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">&#8592; Back</button>';
         html += '<button class="resolution-start-over" onclick="startOver()">New Diagnosis</button>';
         html += '</div></div>';
         document.getElementById('treeContent').innerHTML = html;
+    }
+
+    function explainStep() {
+        if (!currentTree || !currentNodeId) return;
+        var node = currentTree.nodes[currentNodeId];
+        if (!node) return;
+        var treeLabel = currentTree.title || window.__currentDiagTree || 'this diagnostic';
+        var q;
+        if (node.type === 'question') {
+            q = 'I\'m running the ' + treeLabel + ' diagnostic and I\'m at this question: "'
+              + (node.text || '').replace(/"/g, '\\"') + '". '
+              + 'Why is this check important, what am I actually looking for, and what should I do if the answer is ambiguous or borderline?';
+        } else if (node.type === 'instruction') {
+            q = 'I\'m running the ' + treeLabel + ' diagnostic and the app is telling me to: "'
+              + (node.text || '').replace(/"/g, '\\"') + '". '
+              + 'Walk me through it — why am I doing this, what am I actually measuring or confirming, and what common mistakes should I avoid?';
+        } else if (node.type === 'resolution') {
+            q = 'I just landed on the resolution "' + (node.title || 'Resolution').replace(/"/g, '\\"')
+              + '" in the ' + treeLabel + ' diagnostic. Plain-English: what\'s going on with the engine or system, '
+              + 'why did the decision tree route me here, and what should I verify before I replace parts or call it done?';
+        } else {
+            q = 'Explain step "' + currentNodeId + '" of the ' + treeLabel + ' diagnostic — what is it checking and why?';
+        }
+        if (typeof window.askTech === 'function') {
+            window.askTech(q);
+        } else {
+            alert('AI assistant not loaded yet. Try again in a moment.');
+        }
     }
 
     </script>

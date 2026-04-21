@@ -352,6 +352,16 @@
             msg.appendChild(btn);
         }
 
+        // Public hook: other pages can prefill + auto-submit a question.
+        // Opens the overlay if closed, stuffs the text, and sends.
+        window.askTech = function (question) {
+            if (!question) return;
+            overlay.classList.add('open');
+            input.value = String(question);
+            input.dispatchEvent(new Event('input'));
+            setTimeout(function () { submit(); }, 120);
+        };
+
         function submit() {
             var q = input.value.trim();
             if (!q) return;
