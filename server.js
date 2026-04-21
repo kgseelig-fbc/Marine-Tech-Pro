@@ -7,11 +7,11 @@ const path = require('path');
 const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
 const datastore = require('./lib/db');
+const auth = require('./lib/auth');
 
 const app = express();
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
-const ACCESS_CODE = process.env.ACCESS_CODE || '';
 const ADMIN_CODE = process.env.ADMIN_CODE || '';
 const FBC_HUB_URL = process.env.FBC_HUB_URL || 'https://freedomboatclub.ai';
 
@@ -75,13 +75,28 @@ app.use(session({
     proxy: true
 }));
 
+// Passport (for Google OAuth) — no session use; we write our own session fields.
+app.use(auth.passport.initialize());
+
+// Loads req.user from session (or break-glass).
+app.use(auth.loadUser);
+
 // Helpers
 function reqMeta(req) {
     return {
         session_id: req.sessionID ? req.sessionID.slice(0, 16) : null,
         ip: req.ip,
-        ua: req.get('user-agent') || null
+        ua: req.get('user-agent') || null,
+        user_id: req.user && req.user.id ? req.user.id : null
     };
+}
+
+function landingFor(user) {
+    if (!user) return '/login';
+    if (user.role === 'pending') return '/pending';
+    if (user.role === 'denied') return '/login?error=denied';
+    if (user.role === 'admin') return '/admin';
+    return '/';
 }
 
 // --- PUBLIC ROUTES (no auth required) ---
@@ -95,41 +110,178 @@ app.get('/api/health', (req, res) => {
 
 // Login page
 app.get('/login', (req, res) => {
-    if (req.session.authenticated) return res.redirect(req.session.admin ? '/admin' : '/');
+    if (req.user) return res.redirect(landingFor(req.user));
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
 
-// Login API (with login-specific rate limiting)
-app.post('/api/login', loginLimiter, (req, res) => {
-    const password = (req.body.password || '').trim();
+// Pending-approval page
+app.get('/pending', (req, res) => {
+    if (!req.user) return res.redirect('/login');
+    if (req.user.role !== 'pending') return res.redirect(landingFor(req.user));
+    res.sendFile(path.join(__dirname, 'public', 'pending.html'));
+});
+
+// Feature flags & basic identity for the login page
+app.get('/api/auth/config', (req, res) => {
+    res.json({
+        googleEnabled: auth.googleConfigured,
+        adminCodeEnabled: !!ADMIN_CODE
+    });
+});
+
+// Who am I? (used by login page to auto-redirect, and by pending page)
+app.get('/api/me', (req, res) => {
+    if (!req.user) return res.json({ authenticated: false });
+    res.json({
+        authenticated: true,
+        user: {
+            id: req.user.id,
+            email: req.user.email,
+            display_name: req.user.display_name,
+            role: req.user.role,
+            breakglass: !!req.user.breakglass,
+            provider: req.user.provider
+        }
+    });
+});
+
+// Local signup (email + password)
+app.post('/api/auth/signup', loginLimiter, (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const display_name = String(req.body.display_name || '').trim().slice(0, 100) || null;
     const meta = reqMeta(req);
 
-    if (!ACCESS_CODE && !ADMIN_CODE) {
-        return res.json({ success: false, message: 'Server access code not configured' });
+    if (!auth.isEmail(email)) {
+        return res.status(400).json({ success: false, message: 'Please enter a valid email address.' });
     }
-
-    const isAdmin = !!ADMIN_CODE && password === ADMIN_CODE;
-    const isTech  = !!ACCESS_CODE && password === ACCESS_CODE;
-
-    if (isAdmin || isTech) {
+    if (!auth.isStrongEnoughPassword(password)) {
+        return res.status(400).json({ success: false, message: 'Password must be at least 10 characters.' });
+    }
+    if (datastore.getUserByProvider('local', email)) {
+        datastore.logEvent('signup_dup', { ...meta, data: { email } });
+        return res.status(409).json({ success: false, message: 'An account with that email already exists. Try signing in.' });
+    }
+    try {
+        const user = datastore.createLocalUser({
+            email,
+            password_hash: auth.hashPassword(password),
+            display_name,
+            initialAdminEmails: auth.INITIAL_ADMIN_EMAILS
+        });
         req.session.regenerate((err) => {
             if (err) {
-                datastore.logEvent('error', { ...meta, data: { where: 'regenerate', msg: err.message } });
-                return res.json({ success: false, message: 'Session error' });
+                datastore.logEvent('error', { ...meta, data: { where: 'regenerate_signup', msg: err.message } });
+                return res.status(500).json({ success: false, message: 'Session error' });
             }
-            req.session.authenticated = true;
-            req.session.admin = isAdmin;
-            datastore.logEvent(isAdmin ? 'login_ok_admin' : 'login_ok', { ...reqMeta(req) });
-            return res.json({ success: true, admin: isAdmin, redirect: isAdmin ? '/admin' : '/' });
+            req.session.userId = user.id;
+            datastore.touchUserLogin(user.id);
+            datastore.logEvent('signup_ok', { session_id: meta.session_id, ip: req.ip, ua: meta.ua, user_id: user.id, data: { email, role: user.role } });
+            return res.json({ success: true, redirect: landingFor(user), role: user.role });
         });
-    } else {
-        datastore.logEvent('login_fail', { ...meta });
-        res.json({ success: false, message: 'Invalid access code' });
+    } catch (err) {
+        datastore.logEvent('error', { ...meta, data: { where: 'signup', msg: err.message } });
+        return res.status(500).json({ success: false, message: 'Sign-up failed. Try again.' });
     }
 });
 
-// Logout API
+// Local login (email + password)
+app.post('/api/auth/login', loginLimiter, (req, res) => {
+    const email = String(req.body.email || '').trim().toLowerCase();
+    const password = String(req.body.password || '');
+    const meta = reqMeta(req);
+
+    if (!auth.isEmail(email) || !password) {
+        datastore.logEvent('login_fail', { ...meta, data: { reason: 'bad_input' } });
+        return res.status(400).json({ success: false, message: 'Enter your email and password.' });
+    }
+    const user = datastore.getUserByProvider('local', email);
+    if (!user || !auth.verifyPassword(password, user.password_hash)) {
+        datastore.logEvent('login_fail', { ...meta, data: { email } });
+        return res.status(401).json({ success: false, message: 'Invalid email or password.' });
+    }
+    req.session.regenerate((err) => {
+        if (err) {
+            datastore.logEvent('error', { ...meta, data: { where: 'regenerate_login', msg: err.message } });
+            return res.status(500).json({ success: false, message: 'Session error' });
+        }
+        req.session.userId = user.id;
+        datastore.touchUserLogin(user.id);
+        datastore.logEvent('login_ok', { session_id: meta.session_id, ip: req.ip, ua: meta.ua, user_id: user.id });
+        return res.json({ success: true, redirect: landingFor(user), role: user.role });
+    });
+});
+
+// Admin break-glass (ADMIN_CODE only — no user row)
+app.post('/api/auth/admin-code', loginLimiter, (req, res) => {
+    const code = String(req.body.code || '').trim();
+    const meta = reqMeta(req);
+    if (!ADMIN_CODE) {
+        return res.status(503).json({ success: false, message: 'Admin break-glass not configured.' });
+    }
+    if (code !== ADMIN_CODE) {
+        datastore.logEvent('login_fail', { ...meta, data: { reason: 'admin_code' } });
+        return res.status(401).json({ success: false, message: 'Invalid admin access code.' });
+    }
+    req.session.regenerate((err) => {
+        if (err) return res.status(500).json({ success: false, message: 'Session error' });
+        req.session.breakglass = true;
+        datastore.logEvent('login_ok_breakglass', { ...meta });
+        return res.json({ success: true, redirect: '/admin' });
+    });
+});
+
+// Google OAuth — start
+app.get('/auth/google', (req, res, next) => {
+    if (!auth.googleConfigured) return res.redirect('/login?error=google_disabled');
+    return auth.passport.authenticate('google', {
+        scope: ['profile', 'email'],
+        session: false,
+        prompt: 'select_account'
+    })(req, res, next);
+});
+
+// Google OAuth — callback
+app.get('/auth/google/callback',
+    (req, res, next) => {
+        if (!auth.googleConfigured) return res.redirect('/login?error=google_disabled');
+        auth.passport.authenticate('google', { session: false }, (err, user, info) => {
+            const meta = reqMeta(req);
+            if (err) {
+                datastore.logEvent('error', { ...meta, data: { where: 'oauth_google', msg: err.message } });
+                return res.redirect('/login?error=oauth');
+            }
+            if (!user) {
+                datastore.logEvent('login_fail', { ...meta, data: { reason: (info && info.message) || 'oauth_reject' } });
+                return res.redirect('/login?error=oauth');
+            }
+            req.session.regenerate((sErr) => {
+                if (sErr) return res.redirect('/login?error=session');
+                req.session.userId = user.id;
+                datastore.touchUserLogin(user.id);
+                datastore.logEvent('login_ok_google', {
+                    session_id: req.sessionID ? req.sessionID.slice(0, 16) : null,
+                    ip: req.ip,
+                    ua: req.get('user-agent') || null,
+                    user_id: user.id,
+                    data: { email: user.email, role: user.role }
+                });
+                return res.redirect(landingFor(user));
+            });
+        })(req, res, next);
+    }
+);
+
+// Logout
 app.post('/api/logout', (req, res) => {
+    const meta = reqMeta(req);
+    datastore.logEvent('logout', meta);
+    req.session.destroy(() => {
+        res.redirect('/login');
+    });
+});
+// GET logout for convenience (forms / plain links)
+app.get('/logout', (req, res) => {
     const meta = reqMeta(req);
     datastore.logEvent('logout', meta);
     req.session.destroy(() => {
@@ -152,17 +304,8 @@ app.use('/icons', express.static(path.join(__dirname, 'public', 'icons'), static
 
 // --- AUTH MIDDLEWARE (protects everything below) ---
 
-function requireAuth(req, res, next) {
-    if (req.session.authenticated) return next();
-    res.redirect('/login');
-}
-function requireAdmin(req, res, next) {
-    if (req.session.authenticated && req.session.admin) return next();
-    if (req.xhr || req.get('accept') === 'application/json') {
-        return res.status(403).json({ success: false, message: 'Admin only' });
-    }
-    res.redirect('/login');
-}
+const requireAuth = auth.requireAuth;
+const requireAdmin = auth.requireAdmin;
 
 app.use(requireAuth);
 
@@ -178,6 +321,7 @@ app.get('/api/admin/overview', requireAdmin, (req, res) => {
         build: BUILD_SHA,
         startedAt: BUILD_TIME,
         hubUrl: FBC_HUB_URL,
+        pendingCount: datastore.countPending(),
         summary: datastore.getSummary(),
         activity: datastore.getActivityByHour(48),
         topTrees: datastore.getTopTrees(12),
@@ -185,6 +329,61 @@ app.get('/api/admin/overview', requireAdmin, (req, res) => {
         recentEvents: datastore.getRecentEvents(40),
         errors: datastore.getErrors(25)
     });
+});
+
+// --- ADMIN USER MANAGEMENT ---
+
+app.get('/api/admin/users', requireAdmin, (req, res) => {
+    res.json({ success: true, users: datastore.listUsers({ limit: 500 }) });
+});
+
+app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const role = String(req.body.role || '').trim();
+    if (!id || !datastore.ROLES.has(role)) {
+        return res.status(400).json({ success: false, message: 'Invalid id or role' });
+    }
+    const target = datastore.getUserById(id);
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+
+    // Guardrail: prevent break-glass admins (no user id) from demoting themselves — n/a.
+    // Guardrail: a real admin cannot demote the LAST real admin (themselves included).
+    if (target.role === 'admin' && role !== 'admin') {
+        const adminCount = datastore.listUsers({ limit: 500 }).filter(u => u.role === 'admin').length;
+        if (adminCount <= 1) {
+            return res.status(409).json({ success: false, message: 'Cannot demote the last admin.' });
+        }
+    }
+
+    const actorId = req.user && req.user.id ? req.user.id : null;
+    const updated = datastore.setUserRole(id, role, actorId);
+    datastore.logEvent('user_role_change', {
+        ...reqMeta(req),
+        data: { target_id: id, target_email: target.email, from: target.role, to: role }
+    });
+    res.json({ success: true, user: sanitizeUser(updated) });
+});
+
+function sanitizeUser(u) {
+    if (!u) return null;
+    const { password_hash, ...safe } = u;
+    return safe;
+}
+
+app.post('/api/admin/users/:id/delete', requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    if (!id) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const target = datastore.getUserById(id);
+    if (!target) return res.status(404).json({ success: false, message: 'User not found' });
+    if (target.role === 'admin') {
+        const adminCount = datastore.listUsers({ limit: 500 }).filter(u => u.role === 'admin').length;
+        if (adminCount <= 1) {
+            return res.status(409).json({ success: false, message: 'Cannot delete the last admin.' });
+        }
+    }
+    datastore.deleteUser(id);
+    datastore.logEvent('user_delete', { ...reqMeta(req), data: { target_id: id, target_email: target.email } });
+    res.json({ success: true });
 });
 
 // --- CLIENT BEACON ---
@@ -210,7 +409,7 @@ app.use(express.static(path.join(__dirname, 'public'), staticOpts));
 
 // Root serves index.html (techs) or /admin for admins.
 app.get('/', (req, res) => {
-    if (req.session.admin) return res.redirect('/admin');
+    if (req.user && req.user.role === 'admin') return res.redirect('/admin');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
@@ -315,5 +514,15 @@ app.post('/api/ask', askLimiter, async (req, res) => {
 app.listen(PORT, () => {
     console.log(`Marine Tech Pro running on port ${PORT}`);
     console.log(`DB at ${datastore.DB_PATH}`);
-    if (!ADMIN_CODE) console.warn('WARNING: ADMIN_CODE not set — /admin dashboard unreachable.');
+    if (!auth.googleConfigured) {
+        console.warn('NOTE: Google SSO not configured (set GOOGLE_CLIENT_ID + GOOGLE_CLIENT_SECRET).');
+    }
+    if (auth.INITIAL_ADMIN_EMAILS.length === 0) {
+        console.warn('NOTE: INITIAL_ADMIN_EMAILS not set — first sign-in will land in the pending queue with no one to approve them.');
+    } else {
+        console.log(`INITIAL_ADMIN_EMAILS: ${auth.INITIAL_ADMIN_EMAILS.join(', ')}`);
+    }
+    if (!ADMIN_CODE) {
+        console.warn('NOTE: ADMIN_CODE not set — break-glass admin login is disabled.');
+    }
 });

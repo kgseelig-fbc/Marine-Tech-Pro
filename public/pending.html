@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#0B2240">
+    <title>Awaiting approval — Marine Tech Pro</title>
+    <link rel="manifest" href="/manifest.json">
+    <link rel="icon" href="/icons/fbc-logo.jpeg">
+    <link rel="apple-touch-icon" href="/icons/fbc-logo.jpeg">
+    <link rel="stylesheet" href="/css/styles.css">
+    <style>
+        .pending-card h1 { margin-bottom: 10px; }
+        .pending-card .who {
+            font-size: 13px;
+            color: var(--muted);
+            margin: -2px 0 18px;
+            word-break: break-all;
+        }
+        .pending-card .msg {
+            font-size: 14.5px;
+            color: var(--ink-2);
+            line-height: 1.55;
+            margin-bottom: 20px;
+        }
+        .pending-card .msg strong { color: var(--fbc-navy); }
+        .pending-card .btn-secondary {
+            width: 100%;
+            padding: 12px;
+            background: transparent;
+            color: var(--fbc-navy);
+            border: 1.5px solid var(--hairline);
+            border-radius: var(--r-md);
+            font-size: 14px; font-weight: 700;
+            cursor: pointer;
+        }
+        .pending-card .btn-secondary:hover { background: var(--bg-2); }
+
+        .status-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            background: var(--warn-soft);
+            color: #6B4A10;
+            font-size: 11.5px;
+            font-weight: 800;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            padding: 4px 10px;
+            border-radius: var(--r-pill);
+            margin-bottom: 14px;
+        }
+        .status-badge::before {
+            content: '';
+            width: 7px; height: 7px; border-radius: 50%;
+            background: var(--warn);
+            box-shadow: 0 0 0 0 rgba(224, 142, 31, .55);
+            animation: pulse 2s infinite;
+        }
+        @keyframes pulse {
+            0%   { box-shadow: 0 0 0 0 rgba(224,142,31,.55); }
+            70%  { box-shadow: 0 0 0 8px rgba(224,142,31,0); }
+            100% { box-shadow: 0 0 0 0 rgba(224,142,31,0); }
+        }
+    </style>
+</head>
+<body>
+<div class="login-wrap">
+    <div class="login-card pending-card">
+        <div class="brand-mark">
+            <img src="/icons/fbc-logo.jpeg" alt="Freedom Boat Club">
+        </div>
+        <div class="status-badge">Pending approval</div>
+        <h1>You're almost in</h1>
+        <div class="who" id="who">…</div>
+        <div class="msg">
+            Your account has been created but needs <strong>admin approval</strong> before you can use Marine Tech Pro.
+            You'll be able to sign in right after an admin approves you — no further action needed on your end.
+        </div>
+        <button class="btn-secondary" type="button" onclick="checkStatus()">Check status</button>
+        <div class="error-msg" id="statusMsg" style="text-align:center;"></div>
+        <div style="height:10px;"></div>
+        <button class="btn-primary" type="button" onclick="signOut()">Sign out</button>
+
+        <div class="fine">
+            <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
+            Secure session · Freedom Boat Club
+        </div>
+    </div>
+</div>
+<script>
+function $(id){ return document.getElementById(id); }
+
+function signOut() {
+    fetch('/api/logout', { method: 'POST' })
+        .finally(function(){ window.location.replace('/login'); });
+}
+
+function checkStatus() {
+    $('statusMsg').textContent = '';
+    fetch('/api/me')
+        .then(function(r){ return r.json(); })
+        .then(function(m){
+            if (!m.authenticated) { window.location.replace('/login'); return; }
+            var role = m.user && m.user.role;
+            if (role === 'pending') {
+                $('statusMsg').style.color = 'var(--muted)';
+                $('statusMsg').textContent = 'Still pending — an admin hasn’t approved this account yet.';
+                setTimeout(function(){ $('statusMsg').textContent = ''; }, 4000);
+            } else if (role === 'denied') {
+                window.location.replace('/login?error=denied');
+            } else if (role === 'admin') {
+                window.location.replace('/admin');
+            } else {
+                window.location.replace('/');
+            }
+        })
+        .catch(function(){
+            $('statusMsg').style.color = 'var(--danger)';
+            $('statusMsg').textContent = 'Network error — try again.';
+        });
+}
+
+// Render who-is-signed-in line and kick status poll.
+fetch('/api/me').then(function(r){ return r.json(); }).then(function(m){
+    if (!m.authenticated) { window.location.replace('/login'); return; }
+    var u = m.user || {};
+    var via = u.provider === 'google' ? ' · via Google' : u.provider === 'local' ? ' · email/password' : '';
+    $('who').textContent = (u.email || '') + via;
+    // Auto-refresh every 20s — if admin approved, they get bounced in immediately.
+    setInterval(checkStatus, 20000);
+}).catch(function(){});
+</script>
+</body>
+</html>

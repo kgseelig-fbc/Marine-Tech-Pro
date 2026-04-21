@@ -17,6 +17,65 @@
             0%,100%{transform:translateX(0)} 20%{transform:translateX(-8px)}
             40%{transform:translateX(8px)} 60%{transform:translateX(-8px)} 80%{transform:translateX(8px)}
         }
+        .btn-google {
+            width: 100%;
+            padding: 12px 14px;
+            background: #fff;
+            color: #1F1F1F;
+            border: 1.5px solid #DADCE0;
+            border-radius: var(--r-md);
+            font-size: 15px;
+            font-weight: 600;
+            cursor: pointer;
+            display: flex; align-items: center; justify-content: center; gap: 10px;
+            transition: background .15s, box-shadow .15s, border-color .15s;
+        }
+        .btn-google:hover { background: #F8FAFD; border-color: #C1C7CE; box-shadow: 0 1px 3px rgba(0,0,0,.08); }
+        .btn-google:active { background: #F1F3F4; }
+        .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+
+        .divider {
+            display: flex; align-items: center; gap: 10px;
+            margin: 18px 0 14px;
+            color: var(--muted-2);
+            font-size: 11px; font-weight: 700;
+            text-transform: uppercase; letter-spacing: .1em;
+        }
+        .divider::before, .divider::after {
+            content: ''; flex: 1; height: 1px; background: var(--hairline);
+        }
+
+        .mode-toggle {
+            margin-top: 12px;
+            font-size: 13px; color: var(--muted);
+            text-align: center;
+        }
+        .mode-toggle a {
+            color: var(--fbc-navy-3);
+            font-weight: 700;
+            cursor: pointer;
+        }
+        .mode-toggle a:hover { text-decoration: underline; }
+
+        .breakglass-link {
+            margin-top: 14px;
+            font-size: 11.5px; color: var(--muted-2);
+            text-align: center;
+        }
+        .breakglass-link a {
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .breakglass-link a:hover { color: var(--fbc-navy-3); text-decoration: underline; }
+
+        .help-text {
+            font-size: 12px;
+            color: var(--muted);
+            margin: -4px 0 10px;
+            line-height: 1.45;
+        }
+
+        .hidden { display: none !important; }
     </style>
 </head>
 <body>
@@ -26,14 +85,56 @@
             <img src="/icons/fbc-logo.jpeg" alt="Freedom Boat Club">
         </div>
         <h1>Marine Tech Pro</h1>
-        <div class="tagline">Authorized technicians only</div>
+        <div class="tagline" id="tagline">Sign in to continue</div>
 
-        <div class="field">
-            <input type="password" id="loginPassword" placeholder="Access code" autocomplete="off">
+        <!-- PRIMARY SIGN-IN / SIGN-UP FORM -->
+        <div id="mainForm">
+            <button id="googleBtn" class="btn-google hidden" type="button" onclick="signInWithGoogle()">
+                <svg viewBox="0 0 48 48" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                    <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303C33.972 32.91 29.418 36 24 36c-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+                    <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+                    <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238C29.211 35.091 26.715 36 24 36c-5.398 0-9.937-3.07-11.273-7.261l-6.522 5.025C9.49 39.556 16.227 44 24 44z"/>
+                    <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303c-.792 2.237-2.231 4.166-4.087 5.571.001-.001.002-.001.003-.002l6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+                </svg>
+                Continue with Google
+            </button>
+
+            <div id="dividerEl" class="divider hidden">or with email</div>
+
+            <div class="field">
+                <input type="email" id="emailInput" placeholder="Email" autocomplete="email" inputmode="email">
+            </div>
+            <div class="field">
+                <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+            </div>
+            <div class="field hidden" id="nameField">
+                <input type="text" id="nameInput" placeholder="Your name (optional)" autocomplete="name" maxlength="100">
+            </div>
+            <div class="help-text hidden" id="signupHelp">At least 10 characters. New accounts require admin approval before access.</div>
+
+            <button class="btn-primary" id="submitBtn" type="button" onclick="submitForm()">Sign in</button>
+
+            <div class="error-msg" id="errorMsg"></div>
+
+            <div class="mode-toggle">
+                <span id="toggleText">New here?</span>
+                <a id="toggleLink" onclick="toggleMode()">Create an account</a>
+            </div>
         </div>
-        <button class="btn-primary" onclick="attemptLogin()">Sign in</button>
 
-        <div class="error-msg" id="loginError"></div>
+        <!-- BREAK-GLASS ADMIN CODE FORM (hidden by default) -->
+        <div id="breakForm" class="hidden">
+            <div class="field">
+                <input type="password" id="adminCodeInput" placeholder="Admin access code" autocomplete="off">
+            </div>
+            <button class="btn-primary" type="button" onclick="submitAdminCode()">Sign in as admin</button>
+            <div class="error-msg" id="breakErr"></div>
+            <div class="mode-toggle">
+                <a onclick="showMainForm()">Back to sign in</a>
+            </div>
+        </div>
+
+        <div class="breakglass-link" id="breakglassLink"></div>
 
         <div class="fine">
             <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
@@ -43,40 +144,173 @@
 </div>
 
 <script>
-document.getElementById('loginPassword').focus();
-document.getElementById('loginPassword').addEventListener('keydown', function(e) {
-    if (e.key === 'Enter') attemptLogin();
-});
+var mode = 'signin'; // 'signin' | 'signup'
 
-function attemptLogin() {
-    var input = document.getElementById('loginPassword');
-    var errorMsg = document.getElementById('loginError');
-    var password = input.value.trim();
+function $(id) { return document.getElementById(id); }
+function showErr(id, text) {
+    var el = $(id); el.textContent = text;
+    setTimeout(function(){ if (el.textContent === text) el.textContent = ''; }, 5000);
+}
+function shake(inputId) {
+    var el = $(inputId);
+    if (!el) return;
+    el.classList.add('login-shake');
+    setTimeout(function(){ el.classList.remove('login-shake'); }, 500);
+}
 
-    if (!password) return;
+function setMode(next) {
+    mode = next;
+    if (mode === 'signup') {
+        $('tagline').textContent = 'Create an account';
+        $('submitBtn').textContent = 'Create account';
+        $('nameField').classList.remove('hidden');
+        $('signupHelp').classList.remove('hidden');
+        $('toggleText').textContent = 'Already have an account?';
+        $('toggleLink').textContent = 'Sign in';
+        $('passwordInput').setAttribute('autocomplete', 'new-password');
+    } else {
+        $('tagline').textContent = 'Sign in to continue';
+        $('submitBtn').textContent = 'Sign in';
+        $('nameField').classList.add('hidden');
+        $('signupHelp').classList.add('hidden');
+        $('toggleText').textContent = 'New here?';
+        $('toggleLink').textContent = 'Create an account';
+        $('passwordInput').setAttribute('autocomplete', 'current-password');
+    }
+    $('errorMsg').textContent = '';
+}
 
-    fetch('/api/login', {
+function toggleMode() { setMode(mode === 'signin' ? 'signup' : 'signin'); }
+
+function showBreakForm() {
+    $('mainForm').classList.add('hidden');
+    $('breakglassLink').classList.add('hidden');
+    $('breakForm').classList.remove('hidden');
+    $('tagline').textContent = 'Admin break-glass';
+    setTimeout(function(){ $('adminCodeInput').focus(); }, 50);
+}
+function showMainForm() {
+    $('breakForm').classList.add('hidden');
+    $('mainForm').classList.remove('hidden');
+    $('breakglassLink').classList.remove('hidden');
+    setMode(mode);
+}
+
+function submitForm() {
+    var email = $('emailInput').value.trim().toLowerCase();
+    var password = $('passwordInput').value;
+    var name = $('nameInput').value.trim();
+
+    if (!email) { showErr('errorMsg', 'Enter your email.'); shake('emailInput'); return; }
+    if (!password) { showErr('errorMsg', 'Enter your password.'); shake('passwordInput'); return; }
+    if (mode === 'signup' && password.length < 10) {
+        showErr('errorMsg', 'Password must be at least 10 characters.');
+        shake('passwordInput');
+        return;
+    }
+
+    var url = mode === 'signup' ? '/api/auth/signup' : '/api/auth/login';
+    var payload = { email: email, password: password };
+    if (mode === 'signup' && name) payload.display_name = name;
+
+    $('submitBtn').disabled = true;
+    fetch(url, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ password: password })
+        body: JSON.stringify(payload)
     })
-    .then(function(res) { return res.json(); })
-    .then(function(data) {
-        if (data.success) {
-            window.location.replace(data.redirect || '/');
+    .then(function(r){ return r.json().then(function(d){ return { status: r.status, body: d }; }); })
+    .then(function(res){
+        $('submitBtn').disabled = false;
+        var d = res.body;
+        if (d.success) {
+            window.location.replace(d.redirect || '/');
         } else {
-            errorMsg.textContent = data.message || 'Invalid access code';
-            input.classList.add('login-shake');
-            input.value = '';
-            input.focus();
-            setTimeout(function() { input.classList.remove('login-shake'); }, 500);
-            setTimeout(function() { errorMsg.textContent = ''; }, 3000);
+            showErr('errorMsg', d.message || 'Sign-in failed.');
+            shake('passwordInput');
+            $('passwordInput').value = '';
         }
     })
-    .catch(function() {
-        errorMsg.textContent = 'Connection error — try again';
+    .catch(function(){
+        $('submitBtn').disabled = false;
+        showErr('errorMsg', 'Connection error — try again.');
     });
 }
+
+function submitAdminCode() {
+    var code = $('adminCodeInput').value.trim();
+    if (!code) { shake('adminCodeInput'); return; }
+    fetch('/api/auth/admin-code', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code: code })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (d.success) {
+            window.location.replace(d.redirect || '/admin');
+        } else {
+            showErr('breakErr', d.message || 'Invalid code.');
+            shake('adminCodeInput');
+            $('adminCodeInput').value = '';
+        }
+    })
+    .catch(function(){ showErr('breakErr', 'Connection error — try again.'); });
+}
+
+function signInWithGoogle() {
+    window.location.href = '/auth/google';
+}
+
+// Keyboard: Enter submits the current form
+['emailInput','passwordInput','nameInput'].forEach(function(id){
+    var el = $(id); if (!el) return;
+    el.addEventListener('keydown', function(e){ if (e.key === 'Enter') submitForm(); });
+});
+$('adminCodeInput').addEventListener('keydown', function(e){ if (e.key === 'Enter') submitAdminCode(); });
+
+// Surface server-side errors from query string
+(function(){
+    var qs = new URLSearchParams(window.location.search);
+    var err = qs.get('error');
+    if (err) {
+        var msg = ({
+            denied: 'Your account access has been revoked.',
+            oauth: 'Google sign-in was cancelled or failed.',
+            session: 'Session error. Please try again.',
+            google_disabled: 'Google sign-in is not configured yet.'
+        })[err] || 'Something went wrong — please try again.';
+        showErr('errorMsg', msg);
+    }
+})();
+
+// Load feature flags & pre-fill auto-redirect if already signed in
+fetch('/api/auth/config')
+    .then(function(r){ return r.json(); })
+    .then(function(cfg){
+        if (cfg.googleEnabled) {
+            $('googleBtn').classList.remove('hidden');
+            $('dividerEl').classList.remove('hidden');
+        }
+        if (cfg.adminCodeEnabled) {
+            $('breakglassLink').innerHTML = '<a onclick="showBreakForm()">Admin break-glass access</a>';
+        }
+    })
+    .catch(function(){});
+
+// If already signed in, hop straight to the right landing page
+fetch('/api/me')
+    .then(function(r){ return r.json(); })
+    .then(function(m){
+        if (m.authenticated) {
+            var role = m.user && m.user.role;
+            var to = role === 'pending' ? '/pending' : role === 'admin' ? '/admin' : '/';
+            window.location.replace(to);
+        } else {
+            $('emailInput').focus();
+        }
+    })
+    .catch(function(){ $('emailInput').focus(); });
 </script>
 </body>
 </html>

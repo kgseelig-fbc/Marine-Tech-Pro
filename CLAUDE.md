@@ -10,7 +10,7 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 
 - **Install dependencies:** `npm install`
 - **Run the server:** `npm start` (runs `node server.js` on port 3000)
-- **Environment variables:** `PORT`, `ACCESS_CODE` (tech login), `ADMIN_CODE` (admin dashboard login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (Ask-a-Tech AI), `DATA_DIR` (SQLite location — defaults to `/data` if present else `./data`), `FBC_HUB_URL` (defaults to `https://freedomboatclub.ai`), `IP_HASH_SALT`
+- **Environment variables:** `PORT`, `ADMIN_CODE` (break-glass admin login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (Ask-a-Tech AI), `DATA_DIR` (SQLite location — defaults to `/data` if present else `./data`), `FBC_HUB_URL` (defaults to `https://freedomboatclub.ai`), `IP_HASH_SALT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BASE_URL` (e.g. `https://marinetech.freedomboatclub.ai` — used to build the Google OAuth callback URL), `INITIAL_ADMIN_EMAILS` (comma-separated list; matching emails are auto-approved as admin on first sign-in)
 
 There are no tests, linter, or build step configured.
 
@@ -20,12 +20,21 @@ This is a vanilla HTML/CSS/JS app served by an Express.js backend. No frameworks
 
 ### Server (`server.js`)
 
-Express server with session-based authentication. The access code is set via the `ACCESS_CODE` env var. Routes:
+Express server with session-based auth. Three ways in: (1) Google SSO, (2) email/password local signup/login, (3) `ADMIN_CODE` break-glass. Per-user access control lives in a SQLite `users` table with roles `pending`|`tech`|`admin`|`denied`. New sign-ups default to `pending` and can't access anything until an admin approves them from `/admin`. Bootstrap the first admin by adding their email to `INITIAL_ADMIN_EMAILS` — matching emails are auto-approved as admin on first sign-in.
 
-- `/login` (GET) and `/api/login` (POST) — authentication (case-insensitive code match)
-- `/api/logout` (POST) — session destroy
+Auth module lives in `lib/auth.js` (passport config, `loadUser`/`requireAuth`/`requireAdmin` middleware, bcrypt helpers). Routes:
+
+- `/login` (GET) — login/signup page
+- `/pending` (GET) — awaiting-approval page for pending users
+- `/api/auth/config` — feature flags (which auth modes are enabled)
+- `/api/me` — current user info
+- `/api/auth/signup` (POST), `/api/auth/login` (POST) — local email/password
+- `/api/auth/admin-code` (POST) — break-glass admin login
+- `/auth/google`, `/auth/google/callback` — Google OAuth
+- `/api/logout` (POST), `/logout` (GET)
+- `/api/admin/users` (GET), `/api/admin/users/:id/role` (POST), `/api/admin/users/:id/delete` (POST) — admin user management
 - `/api/ask` (POST) — Ask-a-Tech AI endpoint. Uses `@anthropic-ai/sdk` with `claude-sonnet-4-6`. Grounded by the three KB files (diagnostic trees, engine specs, fault codes) loaded at server startup and cached via `cache_control: ephemeral`. Rate-limited to 15 questions/min per IP. Accepts `{ question, context: { tree, node } }`.
-- Auth middleware sits between public routes and `express.static`, so static assets (css/js/icons) bypass auth but HTML pages require it
+- Auth middleware sits between public routes and `express.static`, so static assets (css/icons) bypass auth but HTML pages and JS data files require it. The `loadUser` middleware runs globally and sets `req.user` from the session before any route.
 
 ### Frontend (`public/`)
 

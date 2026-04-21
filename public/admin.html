@@ -159,9 +159,70 @@
         }
         .meta-line .mono { font-family: var(--font-mono); }
 
+        .user-filter {
+            background: var(--bg-2);
+            color: var(--ink-2);
+            border: 1px solid var(--hairline);
+            border-radius: var(--r-pill);
+            padding: 5px 12px;
+            font-size: 12px;
+            font-weight: 700;
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: .05em;
+        }
+        .user-filter:hover { background: var(--bg); }
+        .user-filter.active {
+            background: var(--fbc-navy);
+            color: #fff;
+            border-color: var(--fbc-navy);
+        }
+
+        .user-row .who { font-weight: 700; color: var(--fbc-navy); font-size: 13.5px; }
+        .user-row .em { color: var(--muted); font-size: 12px; display: block; }
+
+        .role-select {
+            background: var(--surface);
+            border: 1px solid var(--hairline);
+            border-radius: var(--r-sm);
+            padding: 5px 8px;
+            font-size: 12.5px;
+            font-weight: 600;
+            color: var(--ink-2);
+            cursor: pointer;
+        }
+        .role-select:focus { outline: none; border-color: var(--fbc-navy-3); }
+
+        .btn-xs {
+            background: var(--bg-2);
+            border: 1px solid var(--hairline);
+            border-radius: var(--r-sm);
+            padding: 4px 10px;
+            font-size: 11.5px;
+            font-weight: 700;
+            color: var(--ink-2);
+            cursor: pointer;
+            text-transform: uppercase;
+            letter-spacing: .04em;
+        }
+        .btn-xs:hover { background: var(--bg); }
+        .btn-xs.primary { background: var(--ok); color: #fff; border-color: var(--ok); }
+        .btn-xs.primary:hover { background: #157a3e; }
+        .btn-xs.danger  { background: transparent; color: var(--danger); border-color: var(--danger-soft); }
+        .btn-xs.danger:hover { background: var(--danger-soft); }
+
+        .pill.role-pending { background: var(--warn-soft);   color: #6B4A10; }
+        .pill.role-tech    { background: var(--info-soft);   color: #174A93; }
+        .pill.role-admin   { background: var(--ok-soft);     color: #0F5A2B; }
+        .pill.role-denied  { background: var(--danger-soft); color: #8A1B20; }
+
         @media (max-width: 640px) {
             .admin-grid { grid-template-columns: repeat(2, 1fr); }
             .q-cell { max-width: 100%; }
+            #usersTable th:nth-child(2),
+            #usersTable td:nth-child(2),
+            #usersTable th:nth-child(4),
+            #usersTable td:nth-child(4) { display: none; }
         }
     </style>
 </head>
@@ -187,6 +248,32 @@
     <div class="meta-line" id="metaLine">Loading…</div>
 
     <section class="admin-grid" id="statGrid"></section>
+
+    <section class="panel" id="usersPanel">
+        <h2>
+            <svg class="icon"><use href="/icons/sprite.svg#i-home"/></svg>
+            User management
+            <span id="pendingBadge" class="pill warn" style="display:none; margin-left:8px;">0 pending</span>
+        </h2>
+        <div class="users-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <button class="user-filter active" data-filter="pending" onclick="setUserFilter('pending')">Pending</button>
+            <button class="user-filter" data-filter="active" onclick="setUserFilter('active')">Active</button>
+            <button class="user-filter" data-filter="all" onclick="setUserFilter('all')">All</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="usersTable">
+                <thead><tr>
+                    <th>User</th>
+                    <th>Provider</th>
+                    <th>Role</th>
+                    <th>Created</th>
+                    <th>Last login</th>
+                    <th style="text-align:right;">Actions</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
 
     <section class="panel">
         <h2><svg class="icon"><use href="/icons/sprite.svg#i-gauge"/></svg> Activity — last 48 hours</h2>
@@ -401,6 +488,118 @@ function renderStats(s) {
         + stat('Total events',       s.total.events,         s.total.aiMessages + ' AI messages',  'i-gauge');
 }
 
+// --- USER MANAGEMENT ---
+
+var userFilter = 'pending';
+var allUsers = [];
+
+function setUserFilter(f) {
+    userFilter = f;
+    document.querySelectorAll('.user-filter').forEach(function(btn){
+        btn.classList.toggle('active', btn.getAttribute('data-filter') === f);
+    });
+    renderUsers(allUsers);
+}
+
+function loadUsers() {
+    return fetch('/api/admin/users')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.success) return;
+            allUsers = d.users || [];
+            renderUsers(allUsers);
+        })
+        .catch(function(){});
+}
+
+function providerLabel(p) {
+    if (p === 'google') return 'Google';
+    if (p === 'local')  return 'Email';
+    return esc(p || '—');
+}
+
+function renderUsers(users) {
+    var tbody = document.querySelector('#usersTable tbody');
+    var rows = users.filter(function(u){
+        if (userFilter === 'pending') return u.role === 'pending';
+        if (userFilter === 'active')  return u.role === 'tech' || u.role === 'admin';
+        return true;
+    });
+
+    var pendingN = users.filter(function(u){ return u.role === 'pending'; }).length;
+    var badge = document.getElementById('pendingBadge');
+    if (pendingN > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = pendingN + ' pending';
+    } else {
+        badge.style.display = 'none';
+    }
+
+    if (!rows.length) {
+        var msg = userFilter === 'pending' ? 'No one waiting for approval.'
+                : userFilter === 'active' ? 'No active users yet.'
+                : 'No users yet.';
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">' + msg + '</td></tr>';
+        return;
+    }
+
+    tbody.innerHTML = rows.map(function(u){
+        var whoName = u.display_name || (u.email || '').split('@')[0] || ('User #' + u.id);
+        var roleOptions = ['pending','tech','admin','denied'].map(function(r){
+            return '<option value="' + r + '"' + (u.role === r ? ' selected' : '') + '>' + r + '</option>';
+        }).join('');
+        var actions = '';
+        if (u.role === 'pending') {
+            actions = ''
+                + '<button class="btn-xs primary" onclick="approveUser(' + u.id + ', \'tech\')">Approve</button> '
+                + '<button class="btn-xs" onclick="approveUser(' + u.id + ', \'admin\')">Make admin</button> '
+                + '<button class="btn-xs danger" onclick="setRole(' + u.id + ', \'denied\')">Deny</button>';
+        } else {
+            actions = '<button class="btn-xs danger" onclick="deleteUser(' + u.id + ')">Delete</button>';
+        }
+        return '<tr class="user-row">'
+             + '<td>'
+             +   '<div class="who">' + esc(whoName) + '</div>'
+             +   '<div class="em">' + esc(u.email || '—') + '</div>'
+             + '</td>'
+             + '<td><span class="pill">' + providerLabel(u.provider) + '</span></td>'
+             + '<td>'
+             +   '<select class="role-select" onchange="setRole(' + u.id + ', this.value)">' + roleOptions + '</select>'
+             + '</td>'
+             + '<td class="mono">' + fmtTime(u.created_at) + '</td>'
+             + '<td class="mono">' + (u.last_login_at ? fmtTime(u.last_login_at) : '—') + '</td>'
+             + '<td style="text-align:right; white-space:nowrap;">' + actions + '</td>'
+             + '</tr>';
+    }).join('');
+}
+
+function approveUser(id, role) { setRole(id, role); }
+
+function setRole(id, role) {
+    fetch('/api/admin/users/' + id + '/role', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ role: role })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (!d.success) { alert(d.message || 'Failed to update role'); return; }
+        loadUsers();
+    })
+    .catch(function(){ alert('Network error'); });
+}
+
+function deleteUser(id) {
+    if (!confirm('Delete this user? They\'ll have to sign up again.')) return;
+    fetch('/api/admin/users/' + id + '/delete', { method: 'POST' })
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.success) { alert(d.message || 'Failed to delete'); return; }
+            loadUsers();
+        })
+        .catch(function(){ alert('Network error'); });
+}
+
 function load() {
     fetch('/api/admin/overview')
         .then(function(r){ return r.json(); })
@@ -421,6 +620,7 @@ function load() {
             document.getElementById('metaLine').textContent = 'Failed to load. Refresh.';
             console.error(e);
         });
+    loadUsers();
 }
 
 load();
