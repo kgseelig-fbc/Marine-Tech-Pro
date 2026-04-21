@@ -11,6 +11,16 @@
     var VOICE_PREF_KEY = 'mtp-voice-pref-v1';
     var RATE_PREF_KEY = 'mtp-voice-rate-v1';
 
+    // Expose askTech() immediately so callers that fire before mount() still work.
+    // Questions queued here get flushed as soon as the widget finishes mounting.
+    var _askQueue = [];
+    var _askReal = null;
+    window.askTech = function (question) {
+        if (!question) return;
+        if (typeof _askReal === 'function') return _askReal(question);
+        _askQueue.push(question);
+    };
+
     // --- VOICE SELECTION ---------------------------------------------------
     // Pick the best-sounding native en-* voice available on the device.
     // Priority:
@@ -352,15 +362,14 @@
             msg.appendChild(btn);
         }
 
-        // Public hook: other pages can prefill + auto-submit a question.
-        // Opens the overlay if closed, stuffs the text, and sends.
-        window.askTech = function (question) {
-            if (!question) return;
+        // Wire up the real askTech implementation and flush any queued calls.
+        _askReal = function (question) {
             overlay.classList.add('open');
             input.value = String(question);
             input.dispatchEvent(new Event('input'));
             setTimeout(function () { submit(); }, 120);
         };
+        while (_askQueue.length) _askReal(_askQueue.shift());
 
         function submit() {
             var q = input.value.trim();

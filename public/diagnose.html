@@ -656,11 +656,7 @@
         } else {
             q = 'Explain step "' + currentNodeId + '" of the ' + treeLabel + ' diagnostic — what is it checking and why?';
         }
-        if (typeof window.askTech === 'function') {
-            window.askTech(q);
-        } else {
-            alert('AI assistant not loaded yet. Try again in a moment.');
-        }
+        window.askTech(q);
     }
 
     </script>
