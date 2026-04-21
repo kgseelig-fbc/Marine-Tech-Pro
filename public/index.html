@@ -74,7 +74,11 @@
             </div>
         </div>
 
-        <div style="text-align:center; margin-top:26px;">
+        <div style="text-align:center; margin-top:26px; display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+            <a href="/admin" id="adminLink" class="btn btn-ghost-dark" style="display:none;">
+                <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-gauge"/></svg>
+                Admin dashboard
+            </a>
             <button onclick="logoutMTP()" class="btn btn-ghost-dark">
                 <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
                 Log out
@@ -89,6 +93,12 @@
             window.location.replace('/login');
         });
     }
+    // Reveal the Admin dashboard link only if this user is an admin.
+    fetch('/api/me').then(function(r){ return r.json(); }).then(function(m){
+        if (m.authenticated && m.user && m.user.role === 'admin') {
+            document.getElementById('adminLink').style.display = 'inline-flex';
+        }
+    }).catch(function(){});
     </script>
     <script src="/js/askTech.js"></script>
 </body>

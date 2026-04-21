@@ -95,7 +95,7 @@ function landingFor(user) {
     if (!user) return '/login';
     if (user.role === 'pending') return '/pending';
     if (user.role === 'denied') return '/login?error=denied';
-    if (user.role === 'admin') return '/admin';
+    // Admins land on the main app like any other user — they can jump to /admin from the UI.
     return '/';
 }
 
@@ -407,9 +407,8 @@ app.post('/api/event', beaconLimiter, (req, res) => {
 // all other assets are only accessible after authentication.
 app.use(express.static(path.join(__dirname, 'public'), staticOpts));
 
-// Root serves index.html (techs) or /admin for admins.
+// Root serves index.html for everyone; admins reach /admin via the in-app link.
 app.get('/', (req, res) => {
-    if (req.user && req.user.role === 'admin') return res.redirect('/admin');
     res.sendFile(path.join(__dirname, 'public', 'index.html'));
 });
 
