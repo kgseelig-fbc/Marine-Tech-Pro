@@ -281,6 +281,34 @@
         </div>
     </section>
 
+    <section class="panel" id="feedbackPanel">
+        <h2>
+            <svg class="icon"><use href="/icons/sprite.svg#i-alert"/></svg>
+            Tech feedback
+            <span id="fbBadge" class="pill warn" style="display:none; margin-left:8px;">0 new</span>
+        </h2>
+        <div class="users-toolbar" style="display:flex; gap:8px; flex-wrap:wrap; margin-bottom:10px;">
+            <button class="user-filter active" data-fbfilter="open" onclick="setFbFilter('open')">Open</button>
+            <button class="user-filter" data-fbfilter="new" onclick="setFbFilter('new')">New</button>
+            <button class="user-filter" data-fbfilter="in_progress" onclick="setFbFilter('in_progress')">In progress</button>
+            <button class="user-filter" data-fbfilter="resolved" onclick="setFbFilter('resolved')">Resolved</button>
+            <button class="user-filter" data-fbfilter="all" onclick="setFbFilter('all')">All</button>
+        </div>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="fbTable">
+                <thead><tr>
+                    <th>Time</th>
+                    <th>User</th>
+                    <th>Type</th>
+                    <th>Message</th>
+                    <th>Context</th>
+                    <th>Status</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+    </section>
+
     <section class="panel">
         <h2><svg class="icon"><use href="/icons/sprite.svg#i-gauge"/></svg> Activity — last 48 hours</h2>
         <svg class="chart" id="chart" viewBox="0 0 800 160" preserveAspectRatio="none"></svg>
@@ -606,6 +634,92 @@ function deleteUser(id) {
         .catch(function(){ alert('Network error'); });
 }
 
+// --- FEEDBACK ---
+
+var fbFilter = 'open';
+var allFeedback = [];
+
+function setFbFilter(f) {
+    fbFilter = f;
+    document.querySelectorAll('[data-fbfilter]').forEach(function(btn){
+        btn.classList.toggle('active', btn.getAttribute('data-fbfilter') === f);
+    });
+    renderFeedback(allFeedback);
+}
+
+function loadFeedback() {
+    return fetch('/api/admin/feedback')
+        .then(function(r){ return r.json(); })
+        .then(function(d){
+            if (!d.success) return;
+            allFeedback = d.feedback || [];
+            renderFeedback(allFeedback);
+        })
+        .catch(function(){});
+}
+
+function renderFeedback(rows) {
+    var tbody = document.querySelector('#fbTable tbody');
+    var filtered = rows.filter(function(f){
+        if (fbFilter === 'open') return f.status === 'new' || f.status === 'in_progress';
+        if (fbFilter === 'all') return true;
+        return f.status === fbFilter;
+    });
+
+    var newN = rows.filter(function(f){ return f.status === 'new'; }).length;
+    var badge = document.getElementById('fbBadge');
+    if (newN > 0) {
+        badge.style.display = 'inline-block';
+        badge.textContent = newN + ' new';
+    } else {
+        badge.style.display = 'none';
+    }
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr><td colspan="6" class="empty">No feedback in this view.</td></tr>';
+        return;
+    }
+
+    var catPill = {
+        bug: 'fail',
+        feedback: 'ai',
+        enhancement: 'warn'
+    };
+
+    tbody.innerHTML = filtered.map(function(f){
+        var who = f.user_name || (f.user_email || '').split('@')[0] || ('User #' + (f.user_id || '?'));
+        var ctxBits = [];
+        if (f.page_url) ctxBits.push(esc(f.page_url));
+        if (f.ctx_tree) ctxBits.push('tree:' + esc(f.ctx_tree) + (f.ctx_node ? '/' + esc(f.ctx_node) : ''));
+        var ctx = ctxBits.length ? '<span class="mono">' + ctxBits.join('<br>') + '</span>' : '<span class="mono">—</span>';
+        var statusOptions = ['new','in_progress','resolved','wont_fix'].map(function(s){
+            return '<option value="' + s + '"' + (f.status === s ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>';
+        }).join('');
+        return '<tr>'
+             + '<td class="mono">' + fmtTime(f.ts) + '</td>'
+             + '<td><div class="who">' + esc(who) + '</div><div class="em">' + esc(f.user_email || '—') + '</div></td>'
+             + '<td><span class="pill ' + (catPill[f.category] || '') + '">' + esc(f.category) + '</span></td>'
+             + '<td class="q-cell">' + esc(f.message) + '</td>'
+             + '<td>' + ctx + '</td>'
+             + '<td><select class="role-select" onchange="setFbStatus(' + f.id + ', this.value)">' + statusOptions + '</select></td>'
+             + '</tr>';
+    }).join('');
+}
+
+function setFbStatus(id, status) {
+    fetch('/api/admin/feedback/' + id + '/status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: status })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (!d.success) { alert(d.message || 'Failed to update'); return; }
+        loadFeedback();
+    })
+    .catch(function(){ alert('Network error'); });
+}
+
 function load() {
     fetch('/api/admin/overview')
         .then(function(r){ return r.json(); })
@@ -627,6 +741,7 @@ function load() {
             console.error(e);
         });
     loadUsers();
+    loadFeedback();
 }
 
 load();

@@ -340,6 +340,7 @@ app.get('/api/admin/overview', requireAdmin, (req, res) => {
         startedAt: BUILD_TIME,
         hubUrl: FBC_HUB_URL,
         pendingCount: datastore.countPending(),
+        newFeedbackCount: datastore.countNewFeedback(),
         summary: datastore.getSummary(),
         activity: datastore.getActivityByHour(48),
         topTrees: datastore.getTopTrees(12),
@@ -402,6 +403,58 @@ app.post('/api/admin/users/:id/delete', requireAdmin, (req, res) => {
     datastore.deleteUser(id);
     datastore.logEvent('user_delete', { ...reqMeta(req), data: { target_id: id, target_email: target.email } });
     res.json({ success: true });
+});
+
+// --- FEEDBACK ---
+// Authenticated techs can submit feedback (bug / feedback / enhancement).
+const feedbackLimiter = rateLimit({ windowMs: 60 * 1000, max: 6, standardHeaders: true, legacyHeaders: false });
+app.post('/api/feedback', feedbackLimiter, (req, res) => {
+    const category = String(req.body.category || '').trim().toLowerCase();
+    const message = String(req.body.message || '').trim();
+    const ctx = req.body.context || {};
+    if (!datastore.FEEDBACK_CATEGORIES.has(category)) {
+        return res.status(400).json({ success: false, message: 'Invalid category.' });
+    }
+    if (!message || message.length < 3) {
+        return res.status(400).json({ success: false, message: 'Please include a short description.' });
+    }
+    if (message.length > 4000) {
+        return res.status(400).json({ success: false, message: 'Message too long (max 4000 chars).' });
+    }
+    const user = req.user || {};
+    const id = datastore.insertFeedback({
+        user_id: user.id || null,
+        user_email: user.email || null,
+        user_name: user.display_name || null,
+        category,
+        message,
+        page_url: ctx.page_url || null,
+        ctx_tree: ctx.tree || null,
+        ctx_node: ctx.node || null,
+        ua: req.get('user-agent') || null
+    });
+    datastore.logEvent('feedback_submit', { ...reqMeta(req), data: { id, category } });
+    res.json({ success: true, id });
+});
+
+app.get('/api/admin/feedback', requireAdmin, (req, res) => {
+    const status = req.query.status ? String(req.query.status) : null;
+    res.json({ success: true, feedback: datastore.listFeedback({ status, limit: 200 }) });
+});
+
+app.post('/api/admin/feedback/:id/status', requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const status = String(req.body.status || '').trim();
+    if (!id || !datastore.FEEDBACK_STATUSES.has(status)) {
+        return res.status(400).json({ success: false, message: 'Invalid id or status' });
+    }
+    try {
+        const updated = datastore.setFeedbackStatus(id, status);
+        datastore.logEvent('feedback_status_change', { ...reqMeta(req), data: { id, status } });
+        res.json({ success: true, feedback: updated });
+    } catch (err) {
+        res.status(400).json({ success: false, message: err.message });
+    }
 });
 
 // --- CLIENT BEACON ---
