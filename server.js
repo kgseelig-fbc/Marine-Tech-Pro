@@ -114,6 +114,18 @@ app.get('/api/health', (req, res) => {
     res.json({ status: 'ok', build: BUILD_SHA, startedAt: BUILD_TIME });
 });
 
+// Public landing / legal pages — required for Google OAuth production verification
+// and usable as the shared homepage/privacy/terms across all FBC internal tools.
+app.get('/landing', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'landing.html'));
+});
+app.get('/privacy', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'privacy.html'));
+});
+app.get('/terms', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'terms.html'));
+});
+
 // Login page
 app.get('/login', (req, res) => {
     if (req.user) return res.redirect(landingFor(req.user));
