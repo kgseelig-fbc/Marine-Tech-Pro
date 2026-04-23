@@ -369,6 +369,199 @@ window.faultCodeDatabase = [
         steps: "Step 1: Check shift linkage adjustment — ensure full engagement in Forward, Neutral, and Reverse.|Step 2: Inspect shift position sensor connector for corrosion.|Step 3: Test sensor output with YDS — should change cleanly between positions.|Step 4: Check wiring from sensor to ECU.|Step 5: Replace sensor if readings are erratic.",
         tools: "YDS, DMM",
         parts: "Shift position sensor"
+    },
+
+    // =============================================
+    // YAMAHA FLASH / SELF-DIAGNOSIS CODES
+    // Sourced from Yamaha F115C (68V-28197-1F-11),
+    // F150TR (63P1F11), and F200/F225TR (69J1D11)
+    // factory service manuals. Read via the on-engine
+    // diagnostic flash indicator with test lead YB-06795
+    // or via Yamaha Diagnostic System (YDS).
+    //
+    // Flash pattern: long light-on pulses = tens digit,
+    // short pulses = ones digit. Example code 23 =
+    // 2 long flashes, pause, 3 short flashes.
+    // =============================================
+
+    {
+        code: "YAM-F-1",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "General",
+        description: "Normal — no faults detected",
+        causes: "This is the normal idle state of the self-diagnosis indicator|Single flash every 4.95 seconds",
+        steps: "Step 1: No action required — the ECM reports all monitored sensors OK.|Step 2: If the engine still exhibits a symptom, use mechanical troubleshooting charts (compression, fuel pressure, cooling, etc.).|Step 3: Remember: self-diagnosis only catches electrical/sensor-range faults, not mechanical problems.",
+        tools: "Diagnostic flash indicator (Yamaha test lead YB-06795) or YDS",
+        parts: ""
+    },
+
+    {
+        code: "YAM-F-13",
+        manufacturer: "Yamaha",
+        severity: "Alarm",
+        system: "Ignition",
+        description: "Incorrect pulser coil signal",
+        causes: "Open or short in pulser coil|Damaged pulser coil lead (W/R, W/B to B)|Air gap out of spec|Damaged flywheel trigger teeth|Corroded ECM connector",
+        steps: "Step 1: Inspect the pulser coil lead for chafing or corrosion at the connector.|Step 2: Measure pulser coil resistance at the ECM connector (F150: 459–561 Ω between W/R,W/B and B).|Step 3: Measure pulser coil peak output voltage with peak voltage adapter — cranking loaded should be 3.0–3.6 V, rising with RPM (F115: 26V @1500, 44V @3500; F150: 23.9V @1500, 49.7V @3500).|Step 4: Check pulser coil air gap 0.3–0.7 mm; if flywheel has been off, verify no metal debris on the coil face.|Step 5: If coil is out of spec, replace pulser coil. If coil is good, check ECM connector and wiring before replacing ECM.",
+        tools: "DMM, peak voltage adapter, feeler gauge, YDS",
+        parts: "Pulser coil assembly"
+    },
+
+    {
+        code: "YAM-F-15",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Cooling",
+        description: "Incorrect engine temperature sensor signal",
+        causes: "Faulty engine coolant temperature sensor|Open or shorted sensor wiring (B/Y lead)|Corroded connector|ECM input fault (rare)",
+        steps: "Step 1: Disconnect the engine temperature sensor and measure resistance cold vs warm. F115 spec: 4.62 kΩ @ 5°C, 2.44 kΩ @ 20°C, 0.19 kΩ @ 100°C. F150 spec: 54.2–69.0 kΩ @ 20°C, 3.12–3.48 kΩ @ 100°C.|Step 2: If resistance is out of spec at a known temperature, replace the sensor.|Step 3: If the sensor is in spec, check the B/Y wire from sensor to ECM for continuity and for shorts to ground.|Step 4: Inspect the connector for corrosion or water intrusion.|Step 5: Clear the code via flash indicator or YDS and verify it doesn't return.",
+        tools: "DMM, thermometer or hot water bath, YDS",
+        parts: "Engine coolant temperature sensor"
+    },
+
+    {
+        code: "YAM-F-18",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Fuel",
+        description: "Incorrect throttle position sensor (TPS) signal",
+        causes: "Faulty TPS|TPS out of adjustment|Open or shorted signal wire (P to B)|Damaged 5V reference|Throttle body binding",
+        steps: "Step 1: Key ON engine OFF — measure TPS output voltage at the P (pink) wire. F115 target: 0.732 ± 0.014 V at idle-stop position. F150 target: 0.70 ± 0.02 V at idle.|Step 2: Verify the 5V reference at the O (orange) wire.|Step 3: Slowly sweep the throttle from closed to wide open while watching voltage — look for any dropouts or dead spots. Output should rise smoothly to ~4.5V at WOT.|Step 4: Inspect the TPS connector for corrosion.|Step 5: If the TPS was disassembled or replaced, perform the throttle position sensor adjustment per the factory procedure — loosen the two TPS screws and rotate the TPS to hit the target idle voltage, then retorque.|Step 6: Replace the TPS if the signal is erratic during sweep.",
+        tools: "DMM, YDS",
+        parts: "Throttle position sensor"
+    },
+
+    {
+        code: "YAM-F-19",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Electrical",
+        description: "Incorrect battery positive voltage",
+        causes: "Low battery|Weak or discharged battery|Failing rectifier/regulator|Loose battery cables or corroded terminals|Blown main fuse|Alternator/stator issue",
+        steps: "Step 1: Measure battery voltage at the battery posts with key OFF. Should be 12.4–12.8 V at rest.|Step 2: Measure voltage at the engine harness battery terminals — if it reads low there but the battery is good, suspect cables or main fuse.|Step 3: Start the engine and measure voltage at the battery with RPM around 1500–2000. Should be 13.8–14.8 V. If not, suspect rectifier/regulator.|Step 4: Measure lighting coil peak voltage (W–W): cranking 7.4–9.3 V, rising to 37 V @1500 rpm and 89 V @3500 rpm open circuit (F115).|Step 5: Measure rectifier/regulator peak output (R–B): 12.5 V @1500, 13.0 V @3500 minimum.|Step 6: Tighten or clean battery terminals; replace main fuse (F115: 20A and 30A); load-test the battery.",
+        tools: "DMM with peak voltage adapter, carbon pile load tester, YDS",
+        parts: "Battery, rectifier/regulator, main fuse, battery cables"
+    },
+
+    {
+        code: "YAM-F-23",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Sensors",
+        description: "Incorrect intake air temperature (IAT) sensor signal",
+        causes: "Faulty IAT sensor|Open or shorted signal wire|Corroded connector|ECM input fault (rare)",
+        steps: "Step 1: Disconnect the IAT sensor and measure resistance. F150 spec: 2.20–2.70 kΩ @ 20°C.|Step 2: Warm the sensor (warm hand or low heat) and watch resistance drop — should change smoothly.|Step 3: If out of spec, replace the sensor.|Step 4: If in spec, check the signal wire from the sensor to the ECM for continuity and opens/shorts.|Step 5: Inspect the connector for corrosion.",
+        tools: "DMM",
+        parts: "Intake air temperature sensor"
+    },
+
+    {
+        code: "YAM-F-28",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Electrical",
+        description: "Incorrect neutral / shift position switch signal (F150/F200); incorrect shift position switch signal (F115)",
+        causes: "Misadjusted shift linkage|Faulty neutral/shift switch|Open or shorted switch wiring|Corroded connector",
+        steps: "Step 1: Verify that the shift control is fully in neutral — a partial detent triggers this code.|Step 2: Inspect the shift position switch and its actuator for mechanical damage or loose mounting.|Step 3: Disconnect the switch and check continuity with the shifter in each position (Neutral vs In-gear) — should be open in one and closed in the other.|Step 4: Check the switch wiring back to the ECM for continuity and shorts.|Step 5: Adjust shift linkage per service manual if switch timing is off; replace switch if contacts are bad.",
+        tools: "DMM, YDS",
+        parts: "Neutral switch / shift position switch"
+    },
+
+    {
+        code: "YAM-F-29",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Fuel",
+        description: "Incorrect intake air pressure (MAP) sensor signal — out of normal operating range",
+        causes: "Faulty MAP sensor|Clogged or disconnected MAP vacuum hose|Large vacuum leak at intake manifold|Signal wire open/short|ECM fault (rare)",
+        steps: "Step 1: Confirm the MAP sensor vacuum hose (if external) is connected and free of kinks, cracks, or blockage.|Step 2: Key ON engine OFF — read MAP sensor voltage. At atmospheric pressure it should read near the sensor's baseline (~4–5V or ~1V depending on variant — cross-check with YDS live data).|Step 3: With engine running at idle, MAP voltage should drop (absolute pressure falls under vacuum). A flat reading indicates sensor or hose problem.|Step 4: Spray intake gaskets with carb cleaner while running — RPM change indicates a vacuum leak.|Step 5: Replace MAP sensor if readings don't track with engine vacuum.",
+        tools: "DMM, vacuum gauge, YDS, carb cleaner",
+        parts: "MAP / intake air pressure sensor"
+    },
+
+    {
+        code: "YAM-F-37",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Fuel",
+        description: "Incorrect idle speed control (ISC) signal (F150/F200); intake passage air leakage (F115)",
+        causes: "ISC valve stuck or dirty|Vacuum leak at intake|Throttle plate stuck or misadjusted|ISC wiring fault|Carbon buildup in throttle body",
+        steps: "Step 1: For F115 reading code 37 (intake air leakage): spray carb cleaner around the intake manifold, throttle body base, and TPS while running at idle. Any RPM change = vacuum leak. Replace gasket or tighten hardware.|Step 2: For F150/F200 reading code 37 (ISC): inspect the idle speed control valve and its passages for carbon or varnish. Clean with intake cleaner.|Step 3: Check ISC valve electrical connection and resistance per service manual.|Step 4: Verify throttle plate fully closes and the throttle link isn't binding — check cable adjustment.|Step 5: Run the TPS adjustment procedure so the ECM has a correct closed-throttle reference before the ISC can work properly.|Step 6: Test drive and watch idle learn.",
+        tools: "DMM, carb cleaner, throttle body cleaner, YDS",
+        parts: "ISC valve, intake manifold gasket, throttle body gasket"
+    },
+
+    {
+        code: "YAM-F-39",
+        manufacturer: "Yamaha",
+        severity: "Alarm",
+        system: "Lubrication",
+        description: "Incorrect oil pressure sensor signal",
+        causes: "Low oil level|Faulty oil pressure sensor/switch|Failing oil pump|Blocked oil strainer|Stuck relief valve|Diluted/contaminated oil|Wiring fault",
+        steps: "Step 1: FIRST — stop the engine and check oil level on the dipstick. Low oil is the most common cause and running further can destroy the engine.|Step 2: Remove the oil pressure sensor and install a mechanical oil pressure gauge. F115 reference: 350 kPa (49.8 PSI) @ idle, 55°C. F150: 450 kPa (65.3 PSI) @ idle. F200: ~650 kPa at 700 rpm.|Step 3: If mechanical pressure is low, check oil strainer for blockage and inspect the oil pump. Relief valve opens at 490 kPa (F115).|Step 4: If mechanical pressure is normal but the code persists, the sensor is faulty or wiring is damaged — replace the sensor.|Step 5: If oil is diluted with fuel or water, find the cause (leaking injector, head gasket, cooling leak) before returning to service.",
+        tools: "Oil pressure gauge, YDS, DMM",
+        parts: "Oil pressure sensor/switch, oil filter, engine oil, oil pump (if confirmed)"
+    },
+
+    {
+        code: "YAM-F-44",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Electrical",
+        description: "Engine stop lanyard switch signal — switch operated or stuck",
+        causes: "Lanyard clip pulled|Lanyard switch contacts dirty or stuck|Damaged lanyard switch wiring|Helm switch fault",
+        steps: "Step 1: Confirm the kill-switch lanyard clip is installed in the RUN position on the helm.|Step 2: Inspect the lanyard switch for water intrusion, corrosion, or a stuck contact.|Step 3: Disconnect the lanyard switch connector and check continuity with clip installed (should be open) and clip removed (should be closed).|Step 4: If stuck closed, replace the switch.|Step 5: On F115 the code sometimes shows as (44) — it's informational that the stop lanyard is currently operating; verify clip position first.",
+        tools: "DMM",
+        parts: "Engine stop lanyard switch"
+    },
+
+    {
+        code: "YAM-F-45",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Electrical",
+        description: "Incorrect shift cut switch signal",
+        causes: "Faulty shift cut switch|Misadjusted shift cam|Damaged wiring|Corroded connector",
+        steps: "Step 1: Verify the shift cut switch activates as the shifter passes through each detent — listen for the click and confirm via YDS.|Step 2: Disconnect the switch and measure continuity between its terminals as the shift actuator is moved manually.|Step 3: If the switch is sticky or doesn't change state, replace it.|Step 4: Check wiring back to the ECM for continuity and shorts.|Step 5: If replaced, test-shift the engine at idle on the muffs and confirm ignition retard during the shift.",
+        tools: "DMM, YDS",
+        parts: "Shift cut switch"
+    },
+
+    {
+        code: "YAM-F-46",
+        manufacturer: "Yamaha",
+        severity: "Alarm",
+        system: "Cooling",
+        description: "Incorrect thermoswitch signal",
+        causes: "Actual overheat condition|Faulty thermoswitch|Broken or corroded thermoswitch wiring|Loose switch connection",
+        steps: "Step 1: If the engine is currently hot, STOP THE ENGINE immediately and let it cool before further testing.|Step 2: Check the water pump tell-tale and cooling water passage — pencil-width steady stream is required.|Step 3: Inspect thermoswitch for corrosion or water intrusion at the connector.|Step 4: Remove the thermoswitch and test in a hot water bath — continuity should change state near 84°C/183°F (check factory spec for your specific part).|Step 5: If the switch is good and cooling is normal, check for damaged wiring or a poor ECM ground.|Step 6: Replace thermoswitch if it doesn't actuate in hot water.",
+        tools: "DMM, thermometer, hot water bath",
+        parts: "Thermoswitch, cooling hose"
+    },
+
+    {
+        code: "YAM-F-49",
+        manufacturer: "Yamaha",
+        severity: "Warning",
+        system: "Ignition",
+        description: "Ignition timing slightly corrected (F115 only — informational, cold start)",
+        causes: "ECM applied cold-start ignition correction|This is informational and normal on cold-start F115",
+        steps: "Step 1: No action required — the ECM is reporting that it applied a small timing correction while the engine is cold.|Step 2: If the code persists long after warmup, check engine temperature sensor reading (should be accurate per the resistance curve) — a stuck-cold sensor will cause continuous timing correction.",
+        tools: "YDS, DMM",
+        parts: ""
+    },
+
+    {
+        code: "YAM-F-59",
+        manufacturer: "Yamaha",
+        severity: "Alarm",
+        system: "Electrical",
+        description: "Memory data overwritten abnormally (F115 only)",
+        causes: "ECM memory corruption|Severe battery voltage dropout during operation|Damaged ECM|Backup power loss",
+        steps: "Step 1: Inspect battery, battery cables, and battery-to-ECM power feed for loose or corroded connections that could cause voltage dropouts.|Step 2: Load-test the battery.|Step 3: Clear the code with YDS or by cycling the diagnostic flash procedure.|Step 4: Run the engine through a full warm-up/WOT cycle and re-check for the code.|Step 5: If code returns, the ECM may need to be replaced.",
+        tools: "DMM, carbon pile load tester, YDS",
+        parts: "Battery, battery cables, ECM (if confirmed)"
     }
 
 ];

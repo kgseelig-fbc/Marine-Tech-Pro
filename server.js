@@ -491,11 +491,20 @@ const anthropicClient = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_AP
 // Load knowledge base once at startup for grounding the model
 function loadKB() {
     const dir = path.join(__dirname, 'public', 'js');
-    return {
+    const kb = {
         trees: fs.readFileSync(path.join(dir, 'diagnosticTrees.js'), 'utf8'),
         specs: fs.readFileSync(path.join(dir, 'engineSpecs.js'), 'utf8'),
         codes: fs.readFileSync(path.join(dir, 'faultcodes.js'), 'utf8')
     };
+    // Optional Yamaha factory service manual reference corpus.
+    // Loaded when present; ignored if the file isn't on disk so the
+    // server still starts cleanly in minimal deployments.
+    try {
+        kb.yamahaManuals = fs.readFileSync(path.join(dir, 'yamahaManuals.js'), 'utf8');
+    } catch (e) {
+        kb.yamahaManuals = '';
+    }
+    return kb;
 }
 const KB = loadKB();
 
@@ -544,7 +553,7 @@ app.post('/api/ask', askLimiter, async (req, res) => {
                 { type: 'text', text: SYSTEM_INSTRUCTIONS },
                 {
                     type: 'text',
-                    text: `KNOWLEDGE BASE — DIAGNOSTIC TREES:\n${KB.trees}\n\nKNOWLEDGE BASE — ENGINE SPECS:\n${KB.specs}\n\nKNOWLEDGE BASE — FAULT CODES:\n${KB.codes}`,
+                    text: `KNOWLEDGE BASE — DIAGNOSTIC TREES:\n${KB.trees}\n\nKNOWLEDGE BASE — ENGINE SPECS:\n${KB.specs}\n\nKNOWLEDGE BASE — FAULT CODES:\n${KB.codes}${KB.yamahaManuals ? `\n\nKNOWLEDGE BASE — YAMAHA FACTORY SERVICE MANUAL REFERENCE (F115C, F150TR, F200TR/F225TR):\n${KB.yamahaManuals}` : ''}`,
                     cache_control: { type: 'ephemeral' }
                 }
             ],

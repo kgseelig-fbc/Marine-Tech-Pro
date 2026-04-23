@@ -3133,6 +3133,396 @@ window.defined_trees = {
 
             wd_fix_short: { id: "wd_fix_short", type: "resolution", severity: "HIGH", title: "Pump Feed Shorted to 12V", text: "Pump runs with panel switch OFF — wire shorted to power.", action: "Trace the pump feed wire for chafe points. Repair with heat-shrink and protect with split loom.", partsNeeded: ["Tinned marine wire", "Heat-shrink connectors", "Split loom"], estimatedTime: "30-90 minutes" }
         }
+    },
+
+    // =============================================
+    // TREE: YAMAHA FLASH-CODE DIAGNOSTIC
+    // Walks a tech through reading and acting on
+    // Yamaha self-diagnosis flash codes on F115C,
+    // F150TR, F200TR and related platforms. Based
+    // on factory service manuals (Yamaha 68V, 63P,
+    // and 69J series).
+    // =============================================
+    yamaha_flash_codes: {
+        title: "Yamaha Flash-Code Diagnostic (F115 / F150 / F200)",
+        requiredTools: [
+            "Yamaha Diagnostic Test Lead YB-06795 (or Yamaha YDS scan tool)",
+            "Digital Multimeter (DMM)",
+            "Peak voltage adapter for DMM",
+            "Service manual for your specific model / HIN"
+        ],
+        startNode: "start",
+        nodes: {
+
+            start: {
+                id: "start",
+                type: "instruction",
+                text: "Confirm all electrical connectors are seated, battery is fully charged, and lanyard is in RUN.",
+                help: "The self-diagnosis only reads accurately if wiring is intact and battery voltage is healthy. Low voltage alone will trigger code 19 and mask other faults.",
+                checklist: [
+                    "Battery at rest: 12.4–12.8 V (load-test if marginal)",
+                    "Lanyard clip installed in RUN position at helm",
+                    "No loose ECM, sensor, or ignition coil connectors",
+                    "No water in the diagnostic connector under the cowling",
+                    "Correct fuses installed (F115: 20A and 30A)"
+                ],
+                options: [
+                    { label: "Everything confirmed — ready to read codes", next: "connect_tool" },
+                    { label: "Battery weak — charge or replace first", next: "fix_battery" },
+                    { label: "Lanyard was off — re-attach and recheck", next: "fix_lanyard" }
+                ]
+            },
+
+            connect_tool: {
+                id: "connect_tool",
+                type: "instruction",
+                text: "Connect the Yamaha diagnostic test lead YB-06795 (or YDS) to the 3-pin diagnostic connector under the cowling, then idle the engine.",
+                help: "The flash indicator blinks a 2-digit code: long pulses = tens, short pulses = ones. Example: code 23 is 2 long + 3 short.",
+                checklist: [
+                    "Remove the 3-pin diagnostic connector cap",
+                    "Plug in the test lead / YDS",
+                    "Start the engine and let it idle (codes only flash with the engine running)",
+                    "Watch the indicator for at least 30 seconds",
+                    "If multiple faults exist, Yamaha flashes the lowest-numbered code first — fix that, then re-check"
+                ],
+                options: [
+                    { label: "Single flash every ~5 seconds — Code 1 (normal)", next: "code_1" },
+                    { label: "Code 13 — pulser coil", next: "code_13" },
+                    { label: "Code 15 — engine temp sensor", next: "code_15" },
+                    { label: "Code 18 — throttle position sensor", next: "code_18" },
+                    { label: "Code 19 — battery voltage", next: "code_19" },
+                    { label: "Code 23 — intake air temp sensor", next: "code_23" },
+                    { label: "Code 28 — neutral / shift position switch", next: "code_28" },
+                    { label: "Code 29 — intake air pressure sensor", next: "code_29" },
+                    { label: "Code 37 — ISC (F150/F200) or intake leak (F115)", next: "code_37" },
+                    { label: "Code 39 — oil pressure sensor", next: "code_39" },
+                    { label: "Code 44 — stop lanyard switch", next: "code_44" },
+                    { label: "Code 45 — shift cut switch", next: "code_45" },
+                    { label: "Code 46 — thermoswitch", next: "code_46" },
+                    { label: "Code 49 or 59 (F115 only)", next: "code_115_only" },
+                    { label: "No flash at all — indicator dark", next: "no_flash" }
+                ]
+            },
+
+            no_flash: {
+                id: "no_flash",
+                type: "instruction",
+                text: "Diagnostic indicator is not lighting. Check power to the indicator and the connector.",
+                checklist: [
+                    "Verify the test lead is the correct Yamaha part (YB-06795)",
+                    "Check the LED itself by testing on a different engine if available",
+                    "Measure 12V at the indicator supply pin with key ON",
+                    "Reseat the 3-pin diagnostic connector under the cowling",
+                    "Inspect the connector for corrosion"
+                ],
+                options: [
+                    { label: "12V is present but no flash — faulty indicator or ECM output", next: "fix_ecm_check" },
+                    { label: "No 12V at indicator — check fuse and main harness", next: "fix_fuse" },
+                    { label: "Now flashing — back to reading codes", next: "connect_tool" }
+                ]
+            },
+
+            code_1: {
+                id: "code_1",
+                type: "resolution",
+                severity: "LOW",
+                title: "Code 1 — Normal",
+                text: "ECM reports no electrical faults on any monitored sensor.",
+                action: "If the engine still has a symptom, the fault is mechanical (compression, cooling, fuel supply, ignition timing) or beyond the ECM's monitored range. Move to the mechanical troubleshooting tree that matches the symptom (no-start, overheat, rough running, etc.).",
+                partsNeeded: [],
+                estimatedTime: "—"
+            },
+
+            code_13: {
+                id: "code_13",
+                type: "instruction",
+                text: "Code 13 — Incorrect pulser coil signal. Measure the pulser coil.",
+                help: "The pulser coil triggers ignition. A failing pulser causes hard starts, misfire, or a no-start with spark issues.",
+                measurement: { label: "Pulser Coil Resistance (W/R,W/B to B)", unit: "Ω", expectedRange: "F150: 459 – 561" },
+                checklist: [
+                    "Disconnect the pulser coil connector at the ECM",
+                    "Measure resistance end-to-end on each coil lead",
+                    "Check peak voltage output (loaded) — F115: 3.0V cranking, 26V @1500 rpm, 44V @3500 rpm; F150: 3.6V cranking, 23.9V @1500, 49.7V @3500",
+                    "Verify pulser coil air gap 0.3–0.7 mm if flywheel has been off",
+                    "Inspect the pulser coil lead for chafing against the flywheel boss"
+                ],
+                options: [
+                    { label: "Resistance out of spec — replace pulser coil", next: "fix_pulser" },
+                    { label: "Resistance OK but peak voltage low — replace pulser coil", next: "fix_pulser" },
+                    { label: "Pulser OK — suspect ECM connector or ECM", next: "fix_ecm_check" }
+                ]
+            },
+
+            code_15: {
+                id: "code_15",
+                type: "instruction",
+                text: "Code 15 — Incorrect engine coolant temperature sensor signal. Resistance test the sensor cold.",
+                measurement: { label: "Engine Temp Sensor Resistance", unit: "kΩ", expectedRange: "F115: 2.44 @ 20°C; F150: 54.2–69.0 @ 20°C" },
+                checklist: [
+                    "Disconnect the sensor and measure resistance at ambient",
+                    "Warm the sensor in a water bath and watch resistance drop",
+                    "F115: 4.62 kΩ @ 5°C, 2.44 kΩ @ 20°C, 0.19 kΩ @ 100°C",
+                    "F150: 54.2–69.0 kΩ @ 20°C, 3.12–3.48 kΩ @ 100°C",
+                    "Check the B/Y wire from sensor to ECM for continuity"
+                ],
+                options: [
+                    { label: "Sensor out of spec — replace", next: "fix_sensor" },
+                    { label: "Sensor OK — repair damaged wiring or connector", next: "fix_wiring" }
+                ]
+            },
+
+            code_18: {
+                id: "code_18",
+                type: "instruction",
+                text: "Code 18 — Incorrect TPS signal. Check TPS output voltage.",
+                help: "If the TPS has been removed or throttle body serviced, it needs adjustment to the factory idle-voltage spec.",
+                measurement: { label: "TPS Output Voltage at idle stop (P wire)", unit: "V", expectedRange: "F115: 0.732 ± 0.014 | F150: 0.70 ± 0.02" },
+                checklist: [
+                    "Back-probe the TPS P (signal) wire with key ON, engine OFF",
+                    "Verify 5V on O (reference) wire",
+                    "Sweep throttle slowly — output should rise smoothly to ~4.5V with no dead spots",
+                    "If TPS was disassembled, loosen the two mounting screws and rotate TPS to hit spec voltage, then retorque"
+                ],
+                options: [
+                    { label: "Voltage erratic or flat — replace TPS", next: "fix_tps" },
+                    { label: "Voltage offset — run TPS adjustment procedure", next: "fix_tps_adjust" },
+                    { label: "TPS and wiring OK — suspect ECM", next: "fix_ecm_check" }
+                ]
+            },
+
+            code_19: {
+                id: "code_19",
+                type: "instruction",
+                text: "Code 19 — Incorrect battery voltage. Measure battery and charging system.",
+                measurement: { label: "Charging Voltage at 1500–2000 RPM", unit: "VDC", expectedRange: "13.8 – 14.8" },
+                checklist: [
+                    "Battery at rest: 12.4–12.8 V",
+                    "Running voltage: 13.8–14.8 V at 1500+ RPM",
+                    "F115 rectifier/regulator peak output (R–B): 12.5V @1500, 13.0V @3500 min",
+                    "Inspect battery cables and main fuse (F115: 20A & 30A)",
+                    "Load-test the battery under cranking load"
+                ],
+                options: [
+                    { label: "Battery weak — replace", next: "fix_battery" },
+                    { label: "Running voltage low — replace rectifier/regulator", next: "fix_regulator" },
+                    { label: "Cables corroded — clean or replace", next: "fix_cables" },
+                    { label: "Voltage is fine now — clear code and retest", next: "clear_and_retest" }
+                ]
+            },
+
+            code_23: {
+                id: "code_23",
+                type: "instruction",
+                text: "Code 23 — Incorrect IAT sensor signal. Resistance test the IAT.",
+                measurement: { label: "IAT Resistance @ 20°C", unit: "kΩ", expectedRange: "F150: 2.20 – 2.70" },
+                checklist: [
+                    "Disconnect IAT and measure resistance at ambient",
+                    "Warm with hand or low heat — resistance should drop smoothly",
+                    "Check signal wire from sensor to ECM for continuity and shorts",
+                    "Inspect connector for corrosion"
+                ],
+                options: [
+                    { label: "Out of spec — replace IAT", next: "fix_sensor" },
+                    { label: "In spec — repair wiring/connector", next: "fix_wiring" }
+                ]
+            },
+
+            code_28: {
+                id: "code_28",
+                type: "instruction",
+                text: "Code 28 — Neutral / shift position switch signal.",
+                checklist: [
+                    "Confirm shifter is fully in neutral (partial detent triggers this)",
+                    "Disconnect the switch and check continuity — must change state between neutral and in-gear",
+                    "Inspect the switch actuator for physical damage",
+                    "Check wiring from switch to ECM"
+                ],
+                options: [
+                    { label: "Switch contacts stuck — replace", next: "fix_neutral_sw" },
+                    { label: "Shift linkage out of adjustment", next: "fix_shift_adjust" },
+                    { label: "Wiring damage — repair", next: "fix_wiring" }
+                ]
+            },
+
+            code_29: {
+                id: "code_29",
+                type: "instruction",
+                text: "Code 29 — Intake air pressure (MAP) sensor out of range.",
+                checklist: [
+                    "Verify MAP vacuum hose (if external) is connected and clear",
+                    "Key ON, engine OFF: MAP reads atmospheric baseline",
+                    "Engine running at idle: voltage should track engine vacuum",
+                    "Spray carb cleaner around intake gaskets — RPM change indicates vacuum leak",
+                    "Compare live MAP data on YDS to TPS position — should correlate"
+                ],
+                options: [
+                    { label: "Large vacuum leak found — fix gasket", next: "fix_intake_gasket" },
+                    { label: "MAP doesn't track vacuum — replace", next: "fix_sensor" },
+                    { label: "Vacuum hose cracked or off — repair", next: "fix_vacuum_line" }
+                ]
+            },
+
+            code_37: {
+                id: "code_37",
+                type: "instruction",
+                text: "Code 37 — F115: intake passage air leakage. F150/F200: idle speed control (ISC) signal.",
+                checklist: [
+                    "F115: spray carb cleaner at intake manifold, throttle body base, TPS — RPM change = vacuum leak. Replace gasket.",
+                    "F150/F200: clean ISC valve passages of carbon and varnish",
+                    "Verify throttle plate fully closes — check cable adjustment and linkage",
+                    "Re-run TPS adjustment so ECM has correct closed-throttle reference",
+                    "Clear the code and let idle learn over several minutes"
+                ],
+                options: [
+                    { label: "Found vacuum leak — replace gasket", next: "fix_intake_gasket" },
+                    { label: "ISC valve dirty — clean and retest", next: "fix_clean_isc" },
+                    { label: "Throttle cable out of adjustment", next: "fix_throttle_adjust" },
+                    { label: "ISC valve electrically faulty — replace", next: "fix_isc" }
+                ]
+            },
+
+            code_39: {
+                id: "code_39",
+                type: "instruction",
+                text: "Code 39 — Oil pressure sensor signal. STOP the engine and check oil level FIRST.",
+                help: "This code can mean real low oil pressure. Running on low oil pressure destroys the engine.",
+                measurement: { label: "Mechanical Oil Pressure at idle", unit: "PSI", expectedRange: "F115: ~50 @ 55°C | F150: ~65 @ idle | F200: ~94 @ 700rpm" },
+                checklist: [
+                    "Dipstick check — top up if low and look for dilution with fuel or water",
+                    "Remove oil pressure sensor and install a mechanical gauge",
+                    "Verify pressure at idle matches factory reference",
+                    "If mechanical pressure is low, inspect oil strainer and pump; relief valve opens at 490 kPa (F115)",
+                    "If mechanical pressure is normal, sensor is faulty — replace"
+                ],
+                options: [
+                    { label: "Oil was low — top up, clear code, monitor", next: "fix_oil_topup" },
+                    { label: "Mechanical pressure low — oil pump / strainer service", next: "fix_oil_pump" },
+                    { label: "Mechanical pressure OK — replace sensor", next: "fix_sensor" },
+                    { label: "Oil contaminated with fuel/water — find cause first", next: "fix_oil_contam" }
+                ]
+            },
+
+            code_44: {
+                id: "code_44",
+                type: "instruction",
+                text: "Code 44 — Stop lanyard switch signal active.",
+                checklist: [
+                    "Verify lanyard clip is installed in RUN position at helm",
+                    "Remove and inspect the lanyard switch for water intrusion and corrosion",
+                    "Continuity test: open with clip installed, closed with clip off",
+                    "Check wiring for shorts to ground"
+                ],
+                options: [
+                    { label: "Lanyard was removed — re-attach", next: "fix_lanyard" },
+                    { label: "Switch contacts stuck closed — replace", next: "fix_lanyard_switch" },
+                    { label: "Wiring shorted to ground — repair", next: "fix_wiring" }
+                ]
+            },
+
+            code_45: {
+                id: "code_45",
+                type: "instruction",
+                text: "Code 45 — Shift cut switch signal.",
+                checklist: [
+                    "Listen for the switch click while shifting through detents",
+                    "Continuity test between switch terminals as shifter moves",
+                    "Verify the switch actuator geometry is intact",
+                    "Check wiring back to the ECM"
+                ],
+                options: [
+                    { label: "Switch sticky / doesn't change state — replace", next: "fix_shift_cut" },
+                    { label: "Wiring damaged — repair", next: "fix_wiring" }
+                ]
+            },
+
+            code_46: {
+                id: "code_46",
+                type: "instruction",
+                text: "Code 46 — Thermoswitch signal. Check for real overheat first.",
+                help: "Stop engine if hot. Thermoswitch is a hard-trip overheat sensor — it may be signaling an actual overheat.",
+                checklist: [
+                    "If engine is hot, STOP and cool before testing",
+                    "Tell-tale pencil-width steady stream — if not, service cooling (impeller, intake)",
+                    "Remove thermoswitch and test in hot water bath — factory spec often ~84°C / 183°F",
+                    "Inspect connector for corrosion",
+                    "Verify ECM ground is clean"
+                ],
+                options: [
+                    { label: "Actual overheat — go to overheat tree", next: "overheat_redirect" },
+                    { label: "Switch doesn't actuate in hot water — replace", next: "fix_thermoswitch" },
+                    { label: "Wiring / connector bad — repair", next: "fix_wiring" }
+                ]
+            },
+
+            code_115_only: {
+                id: "code_115_only",
+                type: "instruction",
+                text: "F115 informational codes — 49 (cold-start timing correction) and 59 (memory overwrite).",
+                checklist: [
+                    "Code 49 at cold start is normal — ECM applied a small ignition correction",
+                    "Code 49 persisting after warmup → engine temp sensor stuck cold (see code 15 steps)",
+                    "Code 59 = ECM memory overwritten abnormally — usually caused by severe voltage dropout during operation",
+                    "Inspect battery cables, main power feed to ECM, and load-test the battery"
+                ],
+                options: [
+                    { label: "Code 49 after warmup — treat as code 15", next: "code_15" },
+                    { label: "Code 59 — clear and test battery/cables", next: "fix_ecm_power" },
+                    { label: "Both cleared and do not return", next: "clear_and_retest" }
+                ]
+            },
+
+            overheat_redirect: {
+                id: "overheat_redirect",
+                type: "resolution",
+                severity: "HIGH",
+                title: "Go to the Engine Overheat tree",
+                text: "Thermoswitch is reporting an overheat. That's a mechanical cooling problem — follow the standard overheat tree.",
+                action: "Exit this tree and start the 'Engine Overheat' diagnostic. Quick checks: water pump tell-tale flow, raw-water intake clear, thermostat operation (F115 opens 48–52°C / F150/F200 58–62°C), impeller condition.",
+                partsNeeded: ["Water pump impeller kit", "Thermostat"],
+                estimatedTime: "1-3 hours"
+            },
+
+            // ==== YAMAHA FLASH-CODE RESOLUTIONS ====
+            fix_pulser: { id: "fix_pulser", type: "resolution", severity: "MEDIUM", title: "Pulser Coil Replacement", text: "Pulser coil out of spec.", action: "Replace pulser coil assembly. Verify air gap 0.3–0.7 mm after installation. Clear code via YDS and verify the engine revs cleanly.", partsNeeded: ["Pulser coil assembly (match part number to serial)"], estimatedTime: "2-4 hours" },
+
+            fix_sensor: { id: "fix_sensor", type: "resolution", severity: "MEDIUM", title: "Replace Sensor", text: "Sensor is out of spec.", action: "Replace the affected sensor with the correct Yamaha part. Apply dielectric grease to the connector. Clear the code and confirm it doesn't return after a warm-up cycle.", partsNeeded: ["Replacement sensor", "Dielectric grease"], estimatedTime: "30-90 minutes" },
+
+            fix_tps: { id: "fix_tps", type: "resolution", severity: "MEDIUM", title: "TPS Replacement", text: "TPS signal is erratic or flat.", action: "Replace the throttle position sensor. Perform the TPS adjustment procedure — loosen the two mounting screws and rotate to hit the factory idle voltage (F115: 0.732V, F150: 0.70V), then retorque. Clear code and verify with YDS live data sweep.", partsNeeded: ["Throttle position sensor", "Dielectric grease"], estimatedTime: "1-2 hours" },
+
+            fix_tps_adjust: { id: "fix_tps_adjust", type: "resolution", severity: "LOW", title: "TPS Adjustment Procedure", text: "TPS signal was offset; rotation adjustment corrected it.", action: "Loosen the TPS mounting screws. Rotate the TPS body while watching signal voltage until it matches the factory idle-stop value. Retorque. Sweep throttle to verify linear rise. Clear code.", partsNeeded: [], estimatedTime: "15-45 minutes" },
+
+            fix_regulator: { id: "fix_regulator", type: "resolution", severity: "MEDIUM", title: "Rectifier / Regulator Replacement", text: "Charging output too low.", action: "Replace the rectifier/regulator. Verify stator/lighting coil output first (F115 lighting coil open-circuit peak: 37V @1500, 89V @3500 rpm) — regulators often die because a failing stator overheated them. Re-test charging voltage after swap.", partsNeeded: ["Rectifier/regulator", "Heat-sink compound"], estimatedTime: "1-2 hours" },
+
+            fix_shift_adjust: { id: "fix_shift_adjust", type: "resolution", severity: "LOW", title: "Shift Linkage Adjustment", text: "Shift linkage out of adjustment; neutral switch saw a partial detent.", action: "Adjust the shift cable per the factory procedure so the shifter detents fully in each position and the switch actuator lines up cleanly. Verify with YDS live data if available.", partsNeeded: [], estimatedTime: "30-60 minutes" },
+
+            fix_intake_gasket: { id: "fix_intake_gasket", type: "resolution", severity: "MEDIUM", title: "Intake Gasket / Leak Repair", text: "Vacuum leak on the intake side.", action: "Replace the intake manifold gasket and/or throttle body gasket. Confirm no cracks at vacuum nipples. Retorque intake per spec. Clear code and run idle-learn.", partsNeeded: ["Intake manifold gasket", "Throttle body gasket"], estimatedTime: "2-4 hours" },
+
+            fix_vacuum_line: { id: "fix_vacuum_line", type: "resolution", severity: "LOW", title: "Vacuum Line Repair", text: "MAP sensor vacuum line cracked or disconnected.", action: "Replace the MAP vacuum hose with correct ID marine-grade vacuum hose. Route away from heat sources. Secure with small clamps if specified.", partsNeeded: ["Vacuum hose", "Small clamps"], estimatedTime: "15-45 minutes" },
+
+            fix_clean_isc: { id: "fix_clean_isc", type: "resolution", severity: "LOW", title: "Clean ISC Valve", text: "Idle speed control valve was carboned up.", action: "Remove the ISC valve and clean passages with throttle-body cleaner and a soft brush. Do NOT use abrasive on the valve seat. Reinstall with a new gasket, reconnect, clear the code, and let idle re-learn.", partsNeeded: ["Throttle-body cleaner", "ISC gasket"], estimatedTime: "1-2 hours" },
+
+            fix_isc: { id: "fix_isc", type: "resolution", severity: "MEDIUM", title: "Replace ISC Valve", text: "Idle speed control valve is electrically or mechanically failed.", action: "Replace the ISC valve with the correct Yamaha part. Install new gasket. Clear code and allow idle to re-learn. Confirm idle RPM matches spec (F115: 750 ± 50, F150: 700 ± 50, F200: 650–750).", partsNeeded: ["ISC valve", "ISC gasket"], estimatedTime: "1-2 hours" },
+
+            fix_throttle_adjust: { id: "fix_throttle_adjust", type: "resolution", severity: "LOW", title: "Throttle Cable / Link Adjustment", text: "Throttle plate wasn't closing fully.", action: "Adjust the throttle cable per the factory 'Adjusting the throttle link and throttle cable' procedure so the plate closes firmly on the idle stop. Then rerun the TPS adjustment. Clear code.", partsNeeded: [], estimatedTime: "30-60 minutes" },
+
+            fix_oil_topup: { id: "fix_oil_topup", type: "resolution", severity: "LOW", title: "Oil Top-Up", text: "Oil level was low.", action: "Top up to the upper dipstick mark with Yamalube 4M 10W-30 (or factory-approved equivalent). Inspect for leaks at the filter, drain plug, and valve cover. Investigate consumption if the engine uses oil between services.", partsNeeded: ["Yamalube 4M 10W-30 engine oil"], estimatedTime: "15-30 minutes" },
+
+            fix_oil_pump: { id: "fix_oil_pump", type: "resolution", severity: "HIGH", title: "Oil Pump / Strainer Service", text: "Low mechanical oil pressure at idle.", action: "Drop the oil pan and inspect the oil strainer for blockage. Inspect the oil pump for worn rotors. Measure pump clearance per service manual. Replace pump if out of spec. Refill with factory oil grade and retest pressure.", partsNeeded: ["Oil pump assembly", "Oil pan gasket", "Oil strainer", "Engine oil and filter"], estimatedTime: "4-8 hours" },
+
+            fix_oil_contam: { id: "fix_oil_contam", type: "resolution", severity: "HIGH", title: "Oil Contamination — Find Source", text: "Oil is diluted with fuel or water.", action: "Do NOT return to service. Milky oil = water intrusion (head gasket, cooling leak, or tall vent). Fuel smell = injector leak or bore wash. Investigate and repair the source, change oil and filter, and re-run diagnosis.", warning: "Running contaminated oil will destroy bearings.", partsNeeded: ["Engine oil and filter", "Replacement gaskets as identified"], estimatedTime: "Varies — several hours minimum" },
+
+            fix_lanyard_switch: { id: "fix_lanyard_switch", type: "resolution", severity: "LOW", title: "Replace Lanyard Switch", text: "Lanyard switch contacts stuck.", action: "Replace the helm lanyard switch. Route wiring away from water paths. Apply dielectric grease to the connector. Test operation — engine must stop with clip removed and run with clip installed.", partsNeeded: ["Engine stop lanyard switch", "Dielectric grease"], estimatedTime: "30-60 minutes" },
+
+            fix_shift_cut: { id: "fix_shift_cut", type: "resolution", severity: "MEDIUM", title: "Replace Shift Cut Switch", text: "Shift cut switch sticky or open.", action: "Replace the shift cut switch. Verify actuator geometry. Test shift under load on muffs or in water — ignition should retard briefly as the shifter crosses the detent.", partsNeeded: ["Shift cut switch"], estimatedTime: "1-2 hours" },
+
+            fix_thermoswitch: { id: "fix_thermoswitch", type: "resolution", severity: "MEDIUM", title: "Replace Thermoswitch", text: "Thermoswitch doesn't actuate at spec temperature.", action: "Replace the thermoswitch with the correct Yamaha part. Apply dielectric grease. Verify after installation: warm the engine and confirm the switch closes near spec temperature (verify per your service manual).", partsNeeded: ["Thermoswitch", "Dielectric grease"], estimatedTime: "30-90 minutes" },
+
+            fix_ecm_check: { id: "fix_ecm_check", type: "resolution", severity: "HIGH", title: "ECM Check", text: "All sensors and wiring check good — suspect ECM.", action: "Before replacing the ECM: verify ECM power, ground, and the 5V reference output at the ECM connector. Inspect every ECM connector pin for spread contacts or water intrusion. If all checks pass, bench-test or substitute a known-good ECM before ordering a replacement. ECMs are expensive and are seldom the actual failure.", warning: "Replace the ECM only after wiring, grounds, and sensors are confirmed good.", partsNeeded: ["ECM (only if confirmed)"], estimatedTime: "2-4 hours diagnostic" },
+
+            fix_ecm_power: { id: "fix_ecm_power", type: "resolution", severity: "MEDIUM", title: "ECM Power Supply Repair", text: "ECM is seeing voltage dropouts.", action: "Trace power from battery through main fuses to ECM. Clean battery posts, replace corroded cables, torque all connections. Load-test the battery. Re-check charging voltage at 1500 RPM (13.8–14.8V).", partsNeeded: ["Battery cables (if damaged)", "Main fuses", "Dielectric grease"], estimatedTime: "1-3 hours" },
+
+            clear_and_retest: { id: "clear_and_retest", type: "resolution", severity: "LOW", title: "Clear Codes and Retest", text: "Fault was transient or already resolved.", action: "Clear stored codes via the flash indicator procedure or YDS. Run the engine through a full idle → WOT → idle cycle and re-check for any codes. Document in the service record.", partsNeeded: [], estimatedTime: "15-30 minutes" }
+        }
     }
 
 };
