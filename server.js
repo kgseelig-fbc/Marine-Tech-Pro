@@ -457,20 +457,34 @@ app.post('/api/admin/feedback/:id/status', requireAdmin, (req, res) => {
     }
 });
 
-// --- ADMIN REPLIES (visible to the original feedback sender) ---
-const repliesLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
-app.get('/api/me/replies', repliesLimiter, (req, res) => {
-    const user = req.user;
-    if (!user || !user.id) return res.json({ success: true, replies: [] });
-    res.json({ success: true, replies: datastore.listUnreadRepliesForUser(user.id) });
+app.post('/api/admin/feedback/:id/reply', requireAdmin, (req, res) => {
+    const id = parseInt(req.params.id, 10);
+    const reply = req.body.reply == null ? null : String(req.body.reply).trim();
+    if (!id) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const updated = datastore.setFeedbackAdminReply(id, reply || null);
+    datastore.logEvent('feedback_reply', { ...reqMeta(req), data: { id, has_reply: !!reply } });
+    res.json({ success: true, feedback: updated });
 });
 
-app.post('/api/me/replies/:id/ack', repliesLimiter, (req, res) => {
-    const user = req.user;
+app.post('/api/admin/feedback/:id/pin', requireAdmin, (req, res) => {
     const id = parseInt(req.params.id, 10);
-    if (!user || !user.id || !id) return res.status(400).json({ success: false });
-    const ok = datastore.markReplySeen(id, user.id);
-    res.json({ success: ok });
+    const flag = !!req.body.pin;
+    if (!id) return res.status(400).json({ success: false, message: 'Invalid id' });
+    const updated = datastore.setFeedbackKnownIssue(id, flag);
+    datastore.logEvent('feedback_pin', { ...reqMeta(req), data: { id, pinned: flag } });
+    res.json({ success: true, feedback: updated });
+});
+
+// --- USER-VISIBLE FEEDBACK STATUS ---
+const feedbackReadLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.get('/api/me/feedback', feedbackReadLimiter, (req, res) => {
+    const user = req.user;
+    if (!user || !user.id) return res.json({ success: true, feedback: [] });
+    res.json({ success: true, feedback: datastore.listFeedbackForUser(user.id) });
+});
+
+app.get('/api/known-issues', feedbackReadLimiter, (req, res) => {
+    res.json({ success: true, issues: datastore.listKnownIssues() });
 });
 
 // --- CLIENT BEACON ---

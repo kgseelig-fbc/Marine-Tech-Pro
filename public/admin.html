@@ -300,9 +300,10 @@
                     <th>Time</th>
                     <th>User</th>
                     <th>Type</th>
-                    <th>Message</th>
+                    <th>Message &amp; note to user</th>
                     <th>Context</th>
                     <th>Status</th>
+                    <th>Pin</th>
                 </tr></thead>
                 <tbody></tbody>
             </table>
@@ -676,7 +677,7 @@ function renderFeedback(rows) {
     }
 
     if (!filtered.length) {
-        tbody.innerHTML = '<tr><td colspan="6" class="empty">No feedback in this view.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">No feedback in this view.</td></tr>';
         return;
     }
 
@@ -695,13 +696,23 @@ function renderFeedback(rows) {
         var statusOptions = ['new','in_progress','resolved','wont_fix'].map(function(s){
             return '<option value="' + s + '"' + (f.status === s ? ' selected' : '') + '>' + s.replace('_',' ') + '</option>';
         }).join('');
+        var reply = f.admin_reply ? esc(f.admin_reply) : '';
+        var pinned = f.is_known_issue ? ' checked' : '';
+        var resolvedAt = f.resolved_at
+            ? '<div class="em">resolved ' + fmtTime(f.resolved_at) + '</div>'
+            : '';
         return '<tr>'
-             + '<td class="mono">' + fmtTime(f.ts) + '</td>'
+             + '<td class="mono">' + fmtTime(f.ts) + resolvedAt + '</td>'
              + '<td><div class="who">' + esc(who) + '</div><div class="em">' + esc(f.user_email || '—') + '</div></td>'
              + '<td><span class="pill ' + (catPill[f.category] || '') + '">' + esc(f.category) + '</span></td>'
-             + '<td class="q-cell">' + esc(f.message) + '</td>'
+             + '<td class="q-cell">'
+             +   '<div>' + esc(f.message) + '</div>'
+             +   '<textarea class="fb-admin-note" id="fbNote' + f.id + '" rows="2" placeholder="Note to user (visible on their feedback tab)…" maxlength="4000">' + reply + '</textarea>'
+             +   '<button class="user-filter" onclick="saveFbReply(' + f.id + ')">Save note</button>'
+             + '</td>'
              + '<td>' + ctx + '</td>'
              + '<td><select class="role-select" onchange="setFbStatus(' + f.id + ', this.value)">' + statusOptions + '</select></td>'
+             + '<td><label class="fb-pin"><input type="checkbox"' + pinned + ' onchange="setFbPin(' + f.id + ', this.checked)"> known</label></td>'
              + '</tr>';
     }).join('');
 }
@@ -715,6 +726,36 @@ function setFbStatus(id, status) {
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (!d.success) { alert(d.message || 'Failed to update'); return; }
+        loadFeedback();
+    })
+    .catch(function(){ alert('Network error'); });
+}
+
+function setFbPin(id, pin) {
+    fetch('/api/admin/feedback/' + id + '/pin', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ pin: pin })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (!d.success) { alert(d.message || 'Failed to update'); return; }
+        loadFeedback();
+    })
+    .catch(function(){ alert('Network error'); });
+}
+
+function saveFbReply(id) {
+    var ta = document.getElementById('fbNote' + id);
+    if (!ta) return;
+    fetch('/api/admin/feedback/' + id + '/reply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ reply: ta.value })
+    })
+    .then(function(r){ return r.json(); })
+    .then(function(d){
+        if (!d.success) { alert(d.message || 'Failed to save'); return; }
         loadFeedback();
     })
     .catch(function(){ alert('Network error'); });

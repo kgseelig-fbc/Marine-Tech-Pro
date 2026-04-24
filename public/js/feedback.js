@@ -1,12 +1,36 @@
 // js/feedback.js
-// Floating feedback widget. Included on every authenticated page.
-// Tech submits a short report categorized as bug / feedback / enhancement.
-// Auto-captures page URL and current diagnostic context when present.
+// Floating feedback widget with three tabs:
+//   - Submit:       new bug/feedback/enhancement report
+//   - My reports:   current tech's submissions with live status + admin note
+//   - Known issues: pinned issues all techs should know about
 
 (function () {
     'use strict';
 
     var SP = '/icons/sprite.svg';
+
+    function esc(s) {
+        if (s == null) return '';
+        return String(s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
+        });
+    }
+
+    function fmtTime(ts) {
+        if (!ts) return '';
+        var diff = Math.floor((Date.now() - ts) / 1000);
+        if (diff < 60) return 'just now';
+        if (diff < 3600) return Math.floor(diff / 60) + 'm ago';
+        if (diff < 86400) return Math.floor(diff / 3600) + 'h ago';
+        var d = new Date(ts);
+        return d.toLocaleDateString() + ' ' + d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+
+    function statusPill(status) {
+        var cls = { 'new': 'warn', 'in_progress': 'ai', 'resolved': 'ok', 'wont_fix': 'muted' }[status] || '';
+        var label = (status || '').replace('_', ' ');
+        return '<span class="pill ' + cls + '">' + esc(label) + '</span>';
+    }
 
     function mount() {
         if (document.getElementById('fb-fab')) return;
@@ -14,8 +38,8 @@
         var fab = document.createElement('button');
         fab.id = 'fb-fab';
         fab.type = 'button';
-        fab.setAttribute('aria-label', 'Send feedback');
-        fab.setAttribute('title', 'Send feedback');
+        fab.setAttribute('aria-label', 'Feedback');
+        fab.setAttribute('title', 'Feedback');
         fab.innerHTML = '<svg class="icon"><use href="' + SP + '#i-alert"/></svg>';
 
         var overlay = document.createElement('div');
@@ -23,23 +47,36 @@
         overlay.innerHTML = ''
             + '<div id="fb-panel">'
             + '  <div id="fb-header">'
-            + '    <div id="fb-title"><svg class="icon"><use href="' + SP + '#i-alert"/></svg> Send feedback</div>'
+            + '    <div id="fb-title"><svg class="icon"><use href="' + SP + '#i-alert"/></svg> Feedback</div>'
             + '    <button id="fb-close" type="button" aria-label="Close"><svg class="icon"><use href="' + SP + '#i-close"/></svg></button>'
             + '  </div>'
+            + '  <div id="fb-tabs">'
+            + '    <button type="button" class="fb-tab active" data-tab="submit">Submit</button>'
+            + '    <button type="button" class="fb-tab" data-tab="mine">My reports</button>'
+            + '    <button type="button" class="fb-tab" data-tab="known">Known issues</button>'
+            + '  </div>'
             + '  <div id="fb-body">'
-            + '    <label class="fb-label">Type</label>'
-            + '    <div id="fb-cat-row">'
-            + '      <button type="button" class="fb-cat active" data-cat="bug">Bug / error</button>'
-            + '      <button type="button" class="fb-cat" data-cat="feedback">Feedback</button>'
-            + '      <button type="button" class="fb-cat" data-cat="enhancement">Enhancement</button>'
+            + '    <div class="fb-tabpane active" data-pane="submit">'
+            + '      <label class="fb-label">Type</label>'
+            + '      <div id="fb-cat-row">'
+            + '        <button type="button" class="fb-cat active" data-cat="bug">Bug / error</button>'
+            + '        <button type="button" class="fb-cat" data-cat="feedback">Feedback</button>'
+            + '        <button type="button" class="fb-cat" data-cat="enhancement">Enhancement</button>'
+            + '      </div>'
+            + '      <label class="fb-label" for="fb-msg">Details</label>'
+            + '      <textarea id="fb-msg" rows="5" placeholder="What happened, what you expected, or what would help…" maxlength="4000"></textarea>'
+            + '      <div id="fb-meta"></div>'
+            + '      <div id="fb-status"></div>'
+            + '      <div id="fb-actions">'
+            + '        <button type="button" id="fb-cancel" class="fb-btn">Cancel</button>'
+            + '        <button type="button" id="fb-send" class="fb-btn primary">Send</button>'
+            + '      </div>'
             + '    </div>'
-            + '    <label class="fb-label" for="fb-msg">Details</label>'
-            + '    <textarea id="fb-msg" rows="5" placeholder="What happened, what you expected, or what would help…" maxlength="4000"></textarea>'
-            + '    <div id="fb-meta"></div>'
-            + '    <div id="fb-status"></div>'
-            + '    <div id="fb-actions">'
-            + '      <button type="button" id="fb-cancel" class="fb-btn">Cancel</button>'
-            + '      <button type="button" id="fb-send" class="fb-btn primary">Send</button>'
+            + '    <div class="fb-tabpane" data-pane="mine">'
+            + '      <div class="fb-list" id="fb-mine-list"><div class="fb-empty">Loading…</div></div>'
+            + '    </div>'
+            + '    <div class="fb-tabpane" data-pane="known">'
+            + '      <div class="fb-list" id="fb-known-list"><div class="fb-empty">Loading…</div></div>'
             + '    </div>'
             + '  </div>'
             + '</div>';
@@ -55,6 +92,10 @@
         var metaEl = overlay.querySelector('#fb-meta');
         var statusEl = overlay.querySelector('#fb-status');
         var catButtons = overlay.querySelectorAll('.fb-cat');
+        var tabButtons = overlay.querySelectorAll('.fb-tab');
+        var panes = overlay.querySelectorAll('.fb-tabpane');
+        var mineList = overlay.querySelector('#fb-mine-list');
+        var knownList = overlay.querySelector('#fb-known-list');
         var currentCat = 'bug';
 
         function open() {
@@ -85,6 +126,17 @@
             });
         }
 
+        function setTab(name) {
+            tabButtons.forEach(function (b) {
+                b.classList.toggle('active', b.getAttribute('data-tab') === name);
+            });
+            panes.forEach(function (p) {
+                p.classList.toggle('active', p.getAttribute('data-pane') === name);
+            });
+            if (name === 'mine') loadMine();
+            if (name === 'known') loadKnown();
+        }
+
         fab.addEventListener('click', open);
         closeBtn.addEventListener('click', close);
         cancelBtn.addEventListener('click', close);
@@ -93,6 +145,9 @@
 
         catButtons.forEach(function (b) {
             b.addEventListener('click', function () { setCategory(b.getAttribute('data-cat')); });
+        });
+        tabButtons.forEach(function (b) {
+            b.addEventListener('click', function () { setTab(b.getAttribute('data-tab')); });
         });
 
         msgInput.addEventListener('keydown', function (e) {
@@ -147,6 +202,79 @@
                     sendBtn.disabled = false;
                     statusEl.textContent = 'Network error. Try again.';
                     statusEl.className = 'err';
+                });
+        }
+
+        function renderItem(row, opts) {
+            opts = opts || {};
+            var ctxBits = [];
+            if (row.ctx_tree) ctxBits.push('tree: ' + row.ctx_tree + (row.ctx_node ? ' / ' + row.ctx_node : ''));
+            else if (row.page_url && !opts.hidePath) ctxBits.push(row.page_url);
+            var ctx = ctxBits.length ? '<div class="fb-item-ctx">' + esc(ctxBits.join(' · ')) + '</div>' : '';
+            var reply = row.admin_reply
+                ? '<div class="fb-item-reply"><div class="fb-item-reply-label">Note from admin</div>'
+                  + '<div class="fb-item-reply-body">' + esc(row.admin_reply) + '</div>'
+                  + (row.admin_reply_at ? '<div class="fb-item-reply-ts">' + esc(fmtTime(row.admin_reply_at)) + '</div>' : '')
+                  + '</div>'
+                : '';
+            var resolvedLine = row.resolved_at
+                ? '<span class="fb-item-ts"> · resolved ' + esc(fmtTime(row.resolved_at)) + '</span>'
+                : '';
+            var catBadge = opts.hideCategory ? '' :
+                '<span class="fb-item-cat">' + esc(row.category || '') + '</span>';
+            return '<div class="fb-item">'
+                +    '<div class="fb-item-head">'
+                +      statusPill(row.status)
+                +      catBadge
+                +      '<span class="fb-item-ts">' + esc(fmtTime(row.ts)) + resolvedLine + '</span>'
+                +    '</div>'
+                +    '<div class="fb-item-msg">' + esc(row.message) + '</div>'
+                +    ctx
+                +    reply
+                +  '</div>';
+        }
+
+        function loadMine() {
+            mineList.innerHTML = '<div class="fb-empty">Loading…</div>';
+            fetch('/api/me/feedback', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) {
+                        mineList.innerHTML = '<div class="fb-empty">Unable to load.</div>';
+                        return;
+                    }
+                    var rows = d.feedback || [];
+                    if (!rows.length) {
+                        mineList.innerHTML = '<div class="fb-empty">You haven’t submitted anything yet.</div>';
+                        return;
+                    }
+                    mineList.innerHTML = rows.map(function (r) { return renderItem(r, {}); }).join('');
+                })
+                .catch(function () {
+                    mineList.innerHTML = '<div class="fb-empty">Network error.</div>';
+                });
+        }
+
+        function loadKnown() {
+            knownList.innerHTML = '<div class="fb-empty">Loading…</div>';
+            fetch('/api/known-issues', { credentials: 'same-origin' })
+                .then(function (r) { return r.ok ? r.json() : null; })
+                .then(function (d) {
+                    if (!d || !d.success) {
+                        knownList.innerHTML = '<div class="fb-empty">Unable to load.</div>';
+                        return;
+                    }
+                    var rows = d.issues || [];
+                    if (!rows.length) {
+                        knownList.innerHTML = '<div class="fb-empty">No known issues right now.</div>';
+                        return;
+                    }
+                    knownList.innerHTML = rows.map(function (r) {
+                        return renderItem(r, { hidePath: true, hideCategory: true });
+                    }).join('');
+                })
+                .catch(function () {
+                    knownList.innerHTML = '<div class="fb-empty">Network error.</div>';
                 });
         }
     }
