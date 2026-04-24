@@ -457,6 +457,22 @@ app.post('/api/admin/feedback/:id/status', requireAdmin, (req, res) => {
     }
 });
 
+// --- ADMIN REPLIES (visible to the original feedback sender) ---
+const repliesLimiter = rateLimit({ windowMs: 60 * 1000, max: 60, standardHeaders: true, legacyHeaders: false });
+app.get('/api/me/replies', repliesLimiter, (req, res) => {
+    const user = req.user;
+    if (!user || !user.id) return res.json({ success: true, replies: [] });
+    res.json({ success: true, replies: datastore.listUnreadRepliesForUser(user.id) });
+});
+
+app.post('/api/me/replies/:id/ack', repliesLimiter, (req, res) => {
+    const user = req.user;
+    const id = parseInt(req.params.id, 10);
+    if (!user || !user.id || !id) return res.status(400).json({ success: false });
+    const ok = datastore.markReplySeen(id, user.id);
+    res.json({ success: ok });
+});
+
 // --- CLIENT BEACON ---
 // Small endpoint the frontend calls to log tree navigations and fault lookups.
 // Authenticated only — no anonymous writes.
