@@ -59,14 +59,23 @@ const globalLimiter = rateLimit({
 });
 app.use('/api', globalLimiter);
 
-// Login-specific rate limiter: 5 attempts per 15 minutes
-const loginLimiter = rateLimit({
-    windowMs: 15 * 60 * 1000,
-    max: 5,
-    standardHeaders: true,
-    legacyHeaders: false,
-    message: { success: false, message: 'Too many login attempts. Please try again later.' }
-});
+// Auth rate limiters: 5 FAILED attempts per 15 minutes per IP, one instance
+// per endpoint so signup, login, and admin-code don't share a counter.
+// Successful requests don't count — several techs signing in from the same
+// shop/marina NAT must not lock each other out.
+function makeAuthLimiter() {
+    return rateLimit({
+        windowMs: 15 * 60 * 1000,
+        max: 5,
+        skipSuccessfulRequests: true,
+        standardHeaders: true,
+        legacyHeaders: false,
+        message: { success: false, message: 'Too many attempts. Please try again later.' }
+    });
+}
+const signupLimiter = makeAuthLimiter();
+const loginLimiter = makeAuthLimiter();
+const adminCodeLimiter = makeAuthLimiter();
 
 // Parse form/JSON bodies
 app.use(express.urlencoded({ extended: true }));
@@ -136,8 +145,22 @@ app.get('/terms', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'terms.html'));
 });
 
+// PWA manifest must be public: browsers fetch <link rel="manifest"> WITHOUT
+// credentials, so behind requireAuth it 302s to /login and the app becomes
+// uninstallable. It contains nothing sensitive.
+app.get('/manifest.json', (req, res) => {
+    res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
 // Login page
 app.get('/login', (req, res) => {
+    // Denied users: destroy the session and render the page, otherwise
+    // landingFor() sends them back to /login in an infinite redirect loop.
+    if (req.user && req.user.role === 'denied') {
+        return req.session.destroy(() => {
+            res.sendFile(path.join(__dirname, 'public', 'login.html'));
+        });
+    }
     if (req.user) return res.redirect(landingFor(req.user));
     res.sendFile(path.join(__dirname, 'public', 'login.html'));
 });
@@ -174,7 +197,7 @@ app.get('/api/me', (req, res) => {
 });
 
 // Local signup (email + password)
-app.post('/api/auth/signup', loginLimiter, (req, res) => {
+app.post('/api/auth/signup', signupLimiter, async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
     const display_name = String(req.body.display_name || '').trim().slice(0, 100) || null;
@@ -196,7 +219,7 @@ app.post('/api/auth/signup', loginLimiter, (req, res) => {
     try {
         const user = datastore.createLocalUser({
             email,
-            password_hash: auth.hashPassword(password),
+            password_hash: await auth.hashPassword(password),
             display_name
         });
         req.session.regenerate((err) => {
@@ -216,7 +239,7 @@ app.post('/api/auth/signup', loginLimiter, (req, res) => {
 });
 
 // Local login (email + password)
-app.post('/api/auth/login', loginLimiter, (req, res) => {
+app.post('/api/auth/login', loginLimiter, async (req, res) => {
     const email = String(req.body.email || '').trim().toLowerCase();
     const password = String(req.body.password || '');
     const meta = reqMeta(req);
@@ -226,7 +249,14 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
         return res.status(400).json({ success: false, message: 'Enter your email and password.' });
     }
     const user = datastore.getUserByProvider('local', email);
-    if (!user || !auth.verifyPassword(password, user.password_hash)) {
+    let passwordOk = false;
+    try {
+        passwordOk = !!user && await auth.verifyPassword(password, user.password_hash);
+    } catch (err) {
+        datastore.logEvent('error', { ...meta, data: { where: 'login_verify', msg: err.message } });
+        return res.status(500).json({ success: false, message: 'Login failed. Try again.' });
+    }
+    if (!passwordOk) {
         datastore.logEvent('login_fail', { ...meta, data: { email } });
         return res.status(401).json({ success: false, message: 'Invalid email or password.' });
     }
@@ -243,7 +273,7 @@ app.post('/api/auth/login', loginLimiter, (req, res) => {
 });
 
 // Admin break-glass (ADMIN_CODE only — no user row)
-app.post('/api/auth/admin-code', loginLimiter, (req, res) => {
+app.post('/api/auth/admin-code', adminCodeLimiter, (req, res) => {
     const code = String(req.body.code || '').trim();
     const meta = reqMeta(req);
     if (!ADMIN_CODE) {
@@ -528,7 +558,11 @@ app.get('/', (req, res) => {
 // --- ASK-A-TECH AI ENDPOINT ---
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
-const anthropicClient = ANTHROPIC_API_KEY ? new Anthropic({ apiKey: ANTHROPIC_API_KEY }) : null;
+// Explicit budget: without these, the SDK defaults to a 10-minute timeout with
+// 2 retries — a degraded upstream could hold a tech's phone connection ~30 min.
+const anthropicClient = ANTHROPIC_API_KEY
+    ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, timeout: 60 * 1000, maxRetries: 1 })
+    : null;
 
 // Load knowledge base once at startup for grounding the model
 function loadKB() {
@@ -582,7 +616,13 @@ app.post('/api/ask', askLimiter, async (req, res) => {
     if (!question) return res.status(400).json({ success: false, message: 'Question required.' });
     if (question.length > 2000) return res.status(400).json({ success: false, message: 'Question too long.' });
 
-    const ctx = req.body.context || {};
+    // Bound client-supplied context: the frontend only sends known tree/node
+    // ids, but a hostile client could stuff ~100 KB of prompt text in here.
+    const rawCtx = req.body.context || {};
+    const ctx = {
+        tree: rawCtx.tree ? String(rawCtx.tree).slice(0, 120) : null,
+        node: rawCtx.node ? String(rawCtx.node).slice(0, 120) : null
+    };
     const ctxLine = ctx.tree
         ? `CURRENT CONTEXT: Tech is in diagnostic tree "${ctx.tree}" at node "${ctx.node || 'unknown'}".`
         : `CURRENT CONTEXT: Tech is browsing the app (no active diagnostic).`;
@@ -596,7 +636,10 @@ app.post('/api/ask', askLimiter, async (req, res) => {
                 {
                     type: 'text',
                     text: `KNOWLEDGE BASE — DIAGNOSTIC TREES:\n${KB.trees}\n\nKNOWLEDGE BASE — ENGINE SPECS:\n${KB.specs}\n\nKNOWLEDGE BASE — FAULT CODES:\n${KB.codes}${KB.yamahaManuals ? `\n\nKNOWLEDGE BASE — YAMAHA FACTORY SERVICE MANUAL REFERENCE (F115C, F150TR, F200TR/F225TR):\n${KB.yamahaManuals}` : ''}`,
-                    cache_control: { type: 'ephemeral' }
+                    // 1h TTL: field usage is bursty and sporadic — the default
+                    // 5-minute TTL misses most reads and re-pays the ~100K-token
+                    // cache write on nearly every question.
+                    cache_control: { type: 'ephemeral', ttl: '1h' }
                 }
             ],
             messages: [
@@ -627,7 +670,15 @@ app.post('/api/ask', askLimiter, async (req, res) => {
             ok: false,
             error: err.message
         });
-        datastore.logEvent('ai_error', { ...meta, data: { msg: err.message } });
+        datastore.logEvent('ai_error', { ...meta, data: { msg: err.message, status: err.status || null } });
+        // Map upstream status through instead of a blanket 500, so the client
+        // backs off on rate limits and surfaces config problems to an admin.
+        if (err.status === 429 || err.status === 529) {
+            return res.status(429).json({ success: false, message: 'AI is busy right now — wait a moment and try again.' });
+        }
+        if (err.status === 401 || err.status === 403) {
+            return res.status(503).json({ success: false, message: 'AI assistant is misconfigured. Tell an admin.' });
+        }
         res.status(500).json({ success: false, message: 'AI request failed. Try again.' });
     }
 });

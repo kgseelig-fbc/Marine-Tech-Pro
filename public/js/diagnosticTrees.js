@@ -748,9 +748,12 @@ window.defined_trees = {
 
             oh_passage_block: {
                 id: "oh_passage_block",
-                type: "instruction",
+                type: "resolution",
+                severity: "MEDIUM",
+                title: "Blocked Cooling Passages — Descale Flush",
                 text: "Cooling passages may be blocked with salt, scale, or corrosion.",
                 action: "This requires flushing the cooling system with a descaling solution. If severely blocked, may need to disassemble and clean at the shop. Check the poppet valve and exhaust cooling passages on Yamaha engines.",
+                partsNeeded: ["Descaling solution (e.g. Salt-Away or Rydlyme)", "Thermostat gaskets if housings are opened"],
                 estimatedTime: "1-4 hours for flush, longer if disassembly needed"
             },
 
