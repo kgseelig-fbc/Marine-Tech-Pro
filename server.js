@@ -1,4 +1,5 @@
 const express = require('express');
+const compression = require('compression');
 const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
 const helmet = require('helmet');
@@ -40,14 +41,23 @@ app.use(helmet({
     }
 }));
 
-// Global rate limiter: 100 requests per 15 minutes
+// Gzip responses — diagnosticTrees.js alone is ~268 KB raw, ~56 KB compressed,
+// and techs load it over marina cell/WiFi.
+app.use(compression());
+
+// Global API rate limiter: 1000 requests per 15 minutes per IP.
+// Scoped to /api only — static assets and page loads are not counted, and the
+// tighter per-endpoint limiters (login, ask, feedback, beacon) remain the real
+// control. /api/health is exempt so platform monitoring can never be throttled.
 const globalLimiter = rateLimit({
     windowMs: 15 * 60 * 1000,
-    max: 100,
+    max: 1000,
     standardHeaders: true,
-    legacyHeaders: false
+    legacyHeaders: false,
+    message: { success: false, message: 'Too many requests. Try again in a few minutes.' },
+    skip: (req) => req.originalUrl === '/api/health'
 });
-app.use(globalLimiter);
+app.use('/api', globalLimiter);
 
 // Login-specific rate limiter: 5 attempts per 15 minutes
 const loginLimiter = rateLimit({
@@ -176,7 +186,10 @@ app.post('/api/auth/signup', loginLimiter, (req, res) => {
     if (!auth.isStrongEnoughPassword(password)) {
         return res.status(400).json({ success: false, message: 'Password must be at least 10 characters.' });
     }
-    if (datastore.getUserByProvider('local', email)) {
+    // Check across ALL providers, not just 'local' — otherwise the same email
+    // can hold two independent identities (e.g. a denied Google user
+    // re-registering locally, or someone claiming an existing user's email).
+    if (datastore.getUserByEmail(email)) {
         datastore.logEvent('signup_dup', { ...meta, data: { email } });
         return res.status(409).json({ success: false, message: 'An account with that email already exists. Try signing in.' });
     }
@@ -184,8 +197,7 @@ app.post('/api/auth/signup', loginLimiter, (req, res) => {
         const user = datastore.createLocalUser({
             email,
             password_hash: auth.hashPassword(password),
-            display_name,
-            initialAdminEmails: auth.INITIAL_ADMIN_EMAILS
+            display_name
         });
         req.session.regenerate((err) => {
             if (err) {
