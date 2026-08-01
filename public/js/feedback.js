@@ -185,7 +185,11 @@
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(payload)
             })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (r) {
+                    return r.json()
+                        .then(function (j) { return { status: r.status, body: j }; })
+                        .catch(function () { return { status: r.status, body: null }; });
+                })
                 .then(function (res) {
                     sendBtn.disabled = false;
                     if (res.body && res.body.success) {
@@ -193,8 +197,14 @@
                         statusEl.className = 'ok';
                         msgInput.value = '';
                         setTimeout(close, 1200);
+                    } else if (res.status === 401) {
+                        statusEl.textContent = 'Session expired. Refresh and sign in again.';
+                        statusEl.className = 'err';
+                    } else if (res.status === 429) {
+                        statusEl.textContent = (res.body && res.body.message) || 'Too many submissions — wait a minute.';
+                        statusEl.className = 'err';
                     } else {
-                        statusEl.textContent = (res.body && res.body.message) || 'Failed to send.';
+                        statusEl.textContent = (res.body && res.body.message) || 'Failed to send (HTTP ' + res.status + ').';
                         statusEl.className = 'err';
                     }
                 })

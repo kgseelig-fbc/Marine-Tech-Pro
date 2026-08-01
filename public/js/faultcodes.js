@@ -119,7 +119,7 @@ window.faultCodeDatabase = [
         code: "SC1000-45",
         manufacturer: "Mercury",
         severity: "Shutdown",
-        system: "Oil",
+        system: "Lubrication",
         description: "Low Oil Pressure — Engine Shutdown",
         causes: "Low oil level|Faulty oil pressure sender|Oil pump failure|Clogged oil pickup screen|Internal bearing failure",
         steps: "Step 1: CHECK OIL LEVEL IMMEDIATELY.|Step 2: Install a mechanical oil pressure gauge to verify actual pressure.|Step 3: At idle should see 25-30+ PSI. At WOT should see 45-65 PSI.|Step 4: If pressure is genuinely low — check oil pickup tube and screen for blockage.|Step 5: If mechanical pressure reads good, replace the oil pressure sender and switch.|Step 6: If pressure is truly low at all RPMs, suspect internal engine damage — DO NOT RUN.",
@@ -176,7 +176,16 @@ window.faultCodeDatabase = [
     },
 
     // =============================================
-    // YAMAHA FAULT CODES
+    // YAMAHA DIAGNOSTIC TROUBLE CODES (YDS / Command Link)
+    //
+    // NOTE: this "YAM-nn" series is a DIFFERENT numbering
+    // scheme from the "YAM-F-nn" flash codes further down.
+    // The same number can mean different things in each
+    // series (e.g. YAM-19 = TPS fault here, but flash code
+    // 19 / YAM-F-19 = battery voltage). When a tech reports
+    // "Yamaha code NN", first establish whether it came from
+    // the YDS scan tool / gauge display (this series) or the
+    // on-engine flash indicator (YAM-F series).
     // =============================================
 
     {
@@ -291,7 +300,7 @@ window.faultCodeDatabase = [
         code: "YAM-42",
         manufacturer: "Yamaha",
         severity: "Shutdown",
-        system: "Oil",
+        system: "Lubrication",
         description: "Oil Pressure Below Minimum — Engine Shutdown",
         causes: "Low oil level|Oil pressure switch failure|Oil pump worn|Clogged oil filter or pickup screen|Internal bearing failure",
         steps: "Step 1: CHECK OIL LEVEL AND CONDITION IMMEDIATELY.|Step 2: Install a mechanical oil pressure gauge to verify actual pressure.|Step 3: Yamaha spec: idle 14+ PSI, WOT 43-71 PSI typical.|Step 4: If pressure reads good mechanically, replace the oil pressure switch.|Step 5: If low, inspect oil filter and pickup screen for blockage.|Step 6: Check oil for metal particles or shiny flakes — indicates bearing failure.|Step 7: Do NOT run engine with confirmed low oil pressure.",
@@ -382,6 +391,11 @@ window.faultCodeDatabase = [
     // Flash pattern: long light-on pulses = tens digit,
     // short pulses = ones digit. Example code 23 =
     // 2 long flashes, pause, 3 short flashes.
+    //
+    // NOTE: flash-code numbers are a DIFFERENT scheme from
+    // the "YAM-nn" YDS/Command Link codes above — the same
+    // number can mean different things in each series
+    // (flash code 19 = battery voltage; YDS YAM-19 = TPS).
     // =============================================
 
     {
@@ -393,7 +407,7 @@ window.faultCodeDatabase = [
         causes: "This is the normal idle state of the self-diagnosis indicator|Single flash every 4.95 seconds",
         steps: "Step 1: No action required — the ECM reports all monitored sensors OK.|Step 2: If the engine still exhibits a symptom, use mechanical troubleshooting charts (compression, fuel pressure, cooling, etc.).|Step 3: Remember: self-diagnosis only catches electrical/sensor-range faults, not mechanical problems.",
         tools: "Diagnostic flash indicator (Yamaha test lead YB-06795) or YDS",
-        parts: ""
+        parts: "None — informational code, no parts required"
     },
 
     {
@@ -549,7 +563,7 @@ window.faultCodeDatabase = [
         causes: "ECM applied cold-start ignition correction|This is informational and normal on cold-start F115",
         steps: "Step 1: No action required — the ECM is reporting that it applied a small timing correction while the engine is cold.|Step 2: If the code persists long after warmup, check engine temperature sensor reading (should be accurate per the resistance curve) — a stuck-cold sensor will cause continuous timing correction.",
         tools: "YDS, DMM",
-        parts: ""
+        parts: "None — informational code, no parts required"
     },
 
     {

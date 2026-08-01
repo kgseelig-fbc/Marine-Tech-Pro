@@ -241,7 +241,9 @@
             micBtn.style.display = 'none';
         } else {
             micBtn.addEventListener('click', function () {
-                if (listening) { stopListening(); return; }
+                // Tapping the mic while listening CANCELS — it must not submit
+                // whatever partial transcript (or pre-existing draft) is in the box.
+                if (listening) { stopListening(true); return; }
                 startListening();
             });
         }
@@ -258,6 +260,8 @@
 
                 var finalText = '';
                 var gotAudio = false;
+                var cancelled = false;
+                var baseline = input.value; // typed draft present before listening
                 recognizer.onaudiostart = function () { gotAudio = true; };
                 recognizer.onresult = function (e) {
                     var interim = '';
@@ -273,17 +277,21 @@
                     console.warn('Speech recognition error:', e.error);
                     if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
                         addMsg('error', 'Microphone permission denied. Allow mic access in your browser settings.');
-                    } else if (e.error === 'no-speech' && !gotAudio) {
-                        // Silent — just stop.
                     }
-                    stopListening();
+                    cancelled = true; // never auto-submit after an error
+                    stopListening(true);
                 };
                 recognizer.onend = function () {
-                    stopListening();
-                    if (input.value.trim()) submit();
+                    // Only auto-submit on a natural end of speech that actually
+                    // produced a transcript — never on cancel/error, and never
+                    // submit a typed draft the user hadn't sent yet.
+                    var spoke = input.value.trim() && input.value !== baseline;
+                    if (listening) stopListening(false);
+                    if (!cancelled && !userCancelled && spoke) submit();
                 };
                 recognizer.start();
                 listening = true;
+                userCancelled = false;
                 micBtn.classList.add('listening');
                 micBtn.setAttribute('aria-label', 'Stop listening');
             } catch (err) {
@@ -292,9 +300,13 @@
             }
         }
 
-        function stopListening() {
+        var userCancelled = false;
+        function stopListening(cancel) {
+            if (cancel) userCancelled = true;
             if (recognizer) {
-                try { recognizer.stop(); } catch (e) { /* ignore */ }
+                // abort() discards the session without firing a final result;
+                // stop() would finalize and let onend auto-submit.
+                try { cancel ? recognizer.abort() : recognizer.stop(); } catch (e) { /* ignore */ }
                 recognizer = null;
             }
             listening = false;
@@ -371,34 +383,51 @@
         };
         while (_askQueue.length) _askReal(_askQueue.shift());
 
+        var busy = false;
         function submit() {
+            if (busy) return; // Enter key must not stack requests while one is in flight
             var q = input.value.trim();
             if (!q) return;
+            busy = true;
             input.value = '';
             input.style.height = 'auto';
             addMsg('user', q);
             var thinking = addMsg('thinking', 'Thinking…');
             sendBtn.disabled = true;
 
+            function done() {
+                thinking.remove();
+                sendBtn.disabled = false;
+                busy = false;
+            }
+
             fetch('/api/ask', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ question: q, context: detectContext() })
             })
-                .then(function (r) { return r.json().then(function (j) { return { ok: r.ok, body: j }; }); })
+                .then(function (r) {
+                    // Non-JSON bodies (proxy errors, redirects) must not be
+                    // misreported as network failures — keep the status.
+                    return r.json()
+                        .then(function (j) { return { status: r.status, body: j }; })
+                        .catch(function () { return { status: r.status, body: null }; });
+                })
                 .then(function (res) {
-                    thinking.remove();
-                    sendBtn.disabled = false;
+                    done();
                     if (res.body && res.body.success) {
                         var msg = addMsg('ai', res.body.answer);
                         addReadAloudButton(msg, res.body.answer);
+                    } else if (res.status === 401) {
+                        addMsg('error', 'Session expired. Refresh the page and sign in again.');
+                    } else if (res.status === 429) {
+                        addMsg('error', (res.body && res.body.message) || 'Too many requests — wait a minute and try again.');
                     } else {
-                        addMsg('error', (res.body && res.body.message) || 'Something went wrong.');
+                        addMsg('error', (res.body && res.body.message) || 'Something went wrong (HTTP ' + res.status + '). Try again.');
                     }
                 })
                 .catch(function () {
-                    thinking.remove();
-                    sendBtn.disabled = false;
+                    done();
                     addMsg('error', 'Network error. Check connection and try again.');
                 });
         }
