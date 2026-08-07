@@ -129,7 +129,7 @@
         var overlay = document.createElement('div');
         overlay.id = 'ask-overlay';
         overlay.innerHTML = ''
-            + '<div id="ask-panel">'
+            + '<div id="ask-panel" role="dialog" aria-modal="true" aria-labelledby="ask-title">'
             + '  <div id="ask-header">'
             + '    <div id="ask-title"><svg class="icon"><use href="' + SP + '#i-ai"/></svg> Ask a Tech</div>'
             + '    <div id="ask-header-actions">'
@@ -173,9 +173,24 @@
         var rateVal = overlay.querySelector('#ask-voice-rate-val');
         var voiceTest = overlay.querySelector('#ask-voice-test');
 
-        fab.addEventListener('click', function () { overlay.classList.add('open'); setTimeout(function () { input.focus(); }, 100); });
-        closeBtn.addEventListener('click', function () { overlay.classList.remove('open'); stopSpeaking(); });
-        overlay.addEventListener('click', function (e) { if (e.target === overlay) { overlay.classList.remove('open'); stopSpeaking(); } });
+        var releaseTrap = null;
+        function openPanel() {
+            if (overlay.classList.contains('open')) return;
+            overlay.classList.add('open');
+            if (window.MTP && MTP.trapFocus) releaseTrap = MTP.trapFocus(panel, closePanel);
+            setTimeout(function () { input.focus(); }, 100);
+        }
+        function closePanel() {
+            if (!overlay.classList.contains('open')) return;
+            overlay.classList.remove('open');
+            stopSpeaking();
+            if (listening) stopListening(true);
+            if (releaseTrap) { releaseTrap(); releaseTrap = null; }
+        }
+
+        fab.addEventListener('click', openPanel);
+        closeBtn.addEventListener('click', closePanel);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) closePanel(); });
         panel.addEventListener('click', function (e) { e.stopPropagation(); });
 
         input.addEventListener('keydown', function (e) {
@@ -376,7 +391,7 @@
 
         // Wire up the real askTech implementation and flush any queued calls.
         _askReal = function (question) {
-            overlay.classList.add('open');
+            openPanel();
             input.value = String(question);
             input.dispatchEvent(new Event('input'));
             setTimeout(function () { submit(); }, 120);

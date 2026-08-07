@@ -45,7 +45,7 @@
         var overlay = document.createElement('div');
         overlay.id = 'fb-overlay';
         overlay.innerHTML = ''
-            + '<div id="fb-panel">'
+            + '<div id="fb-panel" role="dialog" aria-modal="true" aria-labelledby="fb-title">'
             + '  <div id="fb-header">'
             + '    <div id="fb-title"><svg class="icon"><use href="' + SP + '#i-alert"/></svg> Feedback</div>'
             + '    <button id="fb-close" type="button" aria-label="Close"><svg class="icon"><use href="' + SP + '#i-close"/></svg></button>'
@@ -98,15 +98,20 @@
         var knownList = overlay.querySelector('#fb-known-list');
         var currentCat = 'bug';
 
+        var releaseTrap = null;
         function open() {
+            if (overlay.classList.contains('open')) return;
             overlay.classList.add('open');
             statusEl.textContent = '';
             statusEl.className = '';
             updateMeta();
+            if (window.MTP && MTP.trapFocus) releaseTrap = MTP.trapFocus(panel, close);
             setTimeout(function () { msgInput.focus(); }, 100);
         }
         function close() {
+            if (!overlay.classList.contains('open')) return;
             overlay.classList.remove('open');
+            if (releaseTrap) { releaseTrap(); releaseTrap = null; }
         }
 
         function updateMeta() {

@@ -10,9 +10,14 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 
 - **Install dependencies:** `npm install`
 - **Run the server:** `npm start` (runs `node server.js` on port 3000)
+- **Run tests:** `npm test` (validates domain data, then runs the auth-gating suite in `test/` via `node --test`)
+- **Validate data only:** `npm run validate` (checks diagnostic-tree graph integrity, fault-code schema, menu coverage)
+- **Syntax + data check:** `npm run check`
 - **Environment variables:** `PORT`, `ADMIN_CODE` (break-glass admin login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (Ask-a-Tech AI), `DATA_DIR` (SQLite location — defaults to `/data` if present else `./data`), `FBC_HUB_URL` (defaults to `https://freedomboatclub.ai`), `IP_HASH_SALT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BASE_URL` (e.g. `https://marinetech.freedomboatclub.ai` — used to build the Google OAuth callback URL), `INITIAL_ADMIN_EMAILS` (comma-separated list; matching emails are auto-approved as admin on first **Google** sign-in only — local signups never bootstrap to admin because their email is unverified)
 
-There are no tests, linter, or build step configured.
+Also honoured: `RETENTION_DAYS` (telemetry pruning window, default 90).
+
+There is no linter or build step. Tests are plain `node --test` (no framework) plus a data validator; CI runs both on every push/PR (`.github/workflows/ci.yml`).
 
 ## Architecture
 
@@ -31,15 +36,25 @@ Auth module lives in `lib/auth.js` (passport config, `loadUser`/`requireAuth`/`r
 - `/api/auth/signup` (POST), `/api/auth/login` (POST) — local email/password
 - `/api/auth/admin-code` (POST) — break-glass admin login
 - `/auth/google`, `/auth/google/callback` — Google OAuth
-- `/api/logout` (POST), `/logout` (GET)
+- `/api/logout` (POST — the only route that ends a session); `/logout` (GET) renders a confirmation page whose button POSTs, so a session can't be destroyed by a cross-site link
+- `/sw.js` — service worker (public, root scope)
 - `/api/admin/users` (GET), `/api/admin/users/:id/role` (POST), `/api/admin/users/:id/delete` (POST) — admin user management
 - `/api/admin/overview` (GET) — dashboard stats/activity/errors for `/admin`
 - `/api/feedback` (POST) — tech bug/feedback/enhancement submissions; `/api/admin/feedback` (GET), `/api/admin/feedback/:id/status|reply|pin` (POST) — admin triage; `/api/me/feedback` (GET), `/api/known-issues` (GET) — user-visible status
-- `/api/event` (POST) — client beacon for tree navigations, fault lookups, spec views (allowlisted kinds)
+- `/api/event` (POST) — client beacon for tree navigations, fault lookups, spec views (allowlisted kinds; client errors log as `client_error`, never `error`, so the admin error panel can't be spoofed from a browser)
 - `/api/health` (GET) — public health/version endpoint (exempt from rate limiting)
 - `/landing`, `/privacy`, `/terms`, `/manifest.json` — public pages/assets (no auth)
 - `/api/ask` (POST) — Ask-a-Tech AI endpoint. Uses `@anthropic-ai/sdk` with `claude-sonnet-4-6` (60s timeout, 1 retry). Grounded by the four KB files (diagnostic trees, engine specs, fault codes, Yamaha manual reference) loaded at server startup and cached via `cache_control: ephemeral` with a 1h TTL. Rate-limited to 15 questions/min per IP. Accepts `{ question, context: { tree, node } }` (context fields are bounded to 120 chars).
 - Auth middleware sits between public routes and `express.static`, so static assets (css/icons) and the routes above marked public bypass auth, but HTML pages and JS data files require it. The `loadUser` middleware runs globally and sets `req.user` from the session before any route. The global rate limiter applies to `/api/*` only.
+
+**Middleware order in `server.js` is load-bearing** — helmet → compression → `/api` rate limit → `/api` same-origin guard → body parsers → session → `loadUser` → public routes → `/css`+`/icons` static → `requireAuth` → admin routes → protected static → `/api` 404 → error handler. Moving a route across `app.use(requireAuth)` silently changes who can reach it; `test/auth.test.js` guards the main cases.
+
+Other server behaviours worth knowing:
+- **Break-glass sessions carry a tag** derived from `ADMIN_CODE`; `loadUser` re-checks it every request, so rotating the code revokes all existing break-glass sessions immediately. The code itself is compared with `crypto.timingSafeEqual`.
+- **Google OAuth uses a `state` parameter** stored in the session and verified in the callback (login-CSRF protection).
+- **Telemetry retention:** `events`/`ai_messages` older than `RETENTION_DAYS` are pruned at startup and daily.
+- **Graceful shutdown** on SIGTERM/SIGINT drains connections and closes SQLite (Railway sends SIGTERM on redeploy).
+- If a KB file fails to load the server still starts; only `/api/ask` degrades to 503.
 
 ### Frontend (`public/`)
 
@@ -59,9 +74,17 @@ All domain data lives in four JS files that attach to `window`:
 - **`diagnosticTrees.js`** — `window.defined_trees` object. Each tree has `title`, `requiredTools`, `startNode`, and a `nodes` map. Trees: `engine_no_start`, `engine_overheat`, `engine_runs_rough`, `yamaha_flash_codes`, `charging_electrical`, `trim_steering`, `electronics`, `stereo_audio`, `nav_lights`, `horn_system`, `bilge_pump`, `livewell_pump`, `washdown_pump`
 - **`engineSpecs.js`** — `window.engineSpecDatabase` array of engine spec objects (Mercury and Yamaha models)
 - **`faultcodes.js`** — `window.faultCodeDatabase` array. Each entry has `code`, `manufacturer`, `severity` (`Warning`|`Alarm`|`Shutdown`), `system`, `description`, `causes`, `steps`, `tools`, `parts` (causes/steps are pipe-delimited strings). Contains two DISTINCT Yamaha numbering series: `YAM-nn` (YDS/Command Link codes) and `YAM-F-nn` (on-engine flash codes) — the same number means different things in each series
-- **`yamahaManuals.js`** — Yamaha factory service manual reference corpus (F115C/F150TR/F200-F225TR). Server-side AI grounding only; no page loads it
+`public/js/feedback.js`, `public/js/askTech.js` and `public/js/common.js` are UI code (below), not data.
 
-`public/js/feedback.js` and `public/js/askTech.js` are UI widgets (below), not data.
+**`kb/yamahaManuals.js`** — Yamaha factory service manual reference corpus (F115C/F150TR/F200-F225TR). Server-side AI grounding only; deliberately outside `public/` so it isn't shipped to browsers that never load it.
+
+### Shared frontend module (`public/js/common.js`)
+
+Exposes `window.MTP`: `beacon(kind, data)` (POSTs `/api/event`), `logout()` (POST-only), `esc(s)` (HTML escaper), and `trapFocus(panel, onClose)` (modal focus trap + Escape). Also registers the service worker. Loaded before `askTech.js`/`feedback.js` on every authenticated page — add new shared helpers here rather than copy-pasting into page scripts.
+
+### Offline (`public/sw.js`)
+
+Service worker precaches the app shell and the three data files. `/api/*` is never cached; HTML is network-first (so deploys land immediately); JS/CSS/icons are stale-while-revalidate. Bump `CACHE_VERSION` when the precache list changes.
 
 ### Styling
 

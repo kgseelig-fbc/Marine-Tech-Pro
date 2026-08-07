@@ -14,8 +14,18 @@ const auth = require('./lib/auth');
 const app = express();
 app.set("trust proxy", 1);
 const PORT = process.env.PORT || 3000;
-const ADMIN_CODE = process.env.ADMIN_CODE || '';
+const ADMIN_CODE = auth.ADMIN_CODE;
 const FBC_HUB_URL = process.env.FBC_HUB_URL || 'https://freedomboatclub.ai';
+
+// Hosts accepted as same-origin by the CSRF guard, beyond the request's own
+// (proxy-aware) host. Derived from BASE_URL, which already names the canonical
+// public origin for the OAuth callback.
+const ALLOWED_ORIGIN_HOSTS = new Set(
+    [process.env.BASE_URL]
+        .filter(Boolean)
+        .map(u => { try { return new URL(u).host; } catch (_) { return null; } })
+        .filter(Boolean)
+);
 
 // Determine session secret
 let sessionSecret = process.env.SESSION_SECRET;
@@ -59,6 +69,13 @@ const globalLimiter = rateLimit({
 });
 app.use('/api', globalLimiter);
 
+// Reject state-changing API calls that declare a foreign origin (see
+// requireSameOrigin below). Applies to every /api mutation in one place.
+app.use('/api', (req, res, next) => {
+    if (req.method === 'GET' || req.method === 'HEAD' || req.method === 'OPTIONS') return next();
+    return requireSameOrigin(req, res, next);
+});
+
 // Auth rate limiters: 5 FAILED attempts per 15 minutes per IP, one instance
 // per endpoint so signup, login, and admin-code don't share a counter.
 // Successful requests don't count — several techs signing in from the same
@@ -94,7 +111,10 @@ app.use(session({
     cookie: {
         maxAge: 8 * 60 * 60 * 1000, // 8 hours
         httpOnly: true,
-        secure: process.env.NODE_ENV === 'production' ? true : false,
+        // 'auto' sets Secure whenever the connection is HTTPS (honouring
+        // X-Forwarded-Proto, since trust proxy + proxy:true are set). Safer
+        // than keying the flag off NODE_ENV, which an operator can forget.
+        secure: 'auto',
         sameSite: 'lax'
     },
     proxy: true
@@ -114,6 +134,33 @@ function reqMeta(req) {
         ua: req.get('user-agent') || null,
         user_id: req.user && req.user.id ? req.user.id : null
     };
+}
+
+// Defence-in-depth CSRF guard for state-changing requests: SameSite=Lax is
+// the primary control, this rejects anything that declares a foreign origin.
+// Requests with no Origin/Referer at all (curl, older clients) are allowed —
+// browsers always send at least one on cross-site form posts and fetches.
+function requireSameOrigin(req, res, next) {
+    const origin = req.get('origin') || req.get('referer');
+    if (!origin) return next();
+
+    // Compare against the proxy-aware host (and the configured public origin),
+    // not the raw Host header — a fronting proxy that rewrites Host would
+    // otherwise 403 every state-changing request in the app at once.
+    const selfHost = req.get('x-forwarded-host') || req.get('host');
+
+    let host;
+    try {
+        host = new URL(origin).host;
+    } catch (_) {
+        // Unparseable or "null" (sandboxed iframe / opaque origin): fail closed.
+        console.warn(`Cross-origin reject: unparseable origin "${origin}" on ${req.method} ${req.originalUrl}`);
+        return res.status(403).json({ success: false, message: 'Cross-origin request rejected.' });
+    }
+    if (host === selfHost || ALLOWED_ORIGIN_HOSTS.has(host)) return next();
+
+    console.warn(`Cross-origin reject: origin=${host} self=${selfHost} on ${req.method} ${req.originalUrl}`);
+    return res.status(403).json({ success: false, message: 'Cross-origin request rejected.' });
 }
 
 function landingFor(user) {
@@ -150,6 +197,14 @@ app.get('/terms', (req, res) => {
 // uninstallable. It contains nothing sensitive.
 app.get('/manifest.json', (req, res) => {
     res.sendFile(path.join(__dirname, 'public', 'manifest.json'));
+});
+
+// Service worker must be public and served from the root so its scope covers
+// the whole app. It never caches /api responses (see public/sw.js).
+app.get('/sw.js', (req, res) => {
+    res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+    res.type('application/javascript');
+    res.sendFile(path.join(__dirname, 'public', 'sw.js'));
 });
 
 // Login page
@@ -279,32 +334,50 @@ app.post('/api/auth/admin-code', adminCodeLimiter, (req, res) => {
     if (!ADMIN_CODE) {
         return res.status(503).json({ success: false, message: 'Admin break-glass not configured.' });
     }
-    if (code !== ADMIN_CODE) {
+    if (!auth.checkAdminCode(code)) {
         datastore.logEvent('login_fail', { ...meta, data: { reason: 'admin_code' } });
         return res.status(401).json({ success: false, message: 'Invalid admin access code.' });
     }
     req.session.regenerate((err) => {
         if (err) return res.status(500).json({ success: false, message: 'Session error' });
         req.session.breakglass = true;
+        // Stamp the code's tag so rotating ADMIN_CODE revokes this session.
+        req.session.breakglassTag = auth.adminCodeTag();
         datastore.logEvent('login_ok_breakglass', { ...meta });
         return res.json({ success: true, redirect: '/admin' });
     });
 });
 
-// Google OAuth — start
+// Google OAuth — start.
+// A random `state` value is stored in the session and verified in the
+// callback: without it an attacker can feed a victim a pre-baked callback
+// URL and silently sign them into the attacker's account (login CSRF).
 app.get('/auth/google', (req, res, next) => {
     if (!auth.googleConfigured) return res.redirect('/login?error=google_disabled');
-    return auth.passport.authenticate('google', {
-        scope: ['profile', 'email'],
-        session: false,
-        prompt: 'select_account'
-    })(req, res, next);
+    const state = crypto.randomBytes(16).toString('hex');
+    req.session.oauthState = state;
+    req.session.save((err) => {
+        if (err) return res.redirect('/login?error=session');
+        return auth.passport.authenticate('google', {
+            scope: ['profile', 'email'],
+            session: false,
+            prompt: 'select_account',
+            state
+        })(req, res, next);
+    });
 });
 
 // Google OAuth — callback
 app.get('/auth/google/callback',
     (req, res, next) => {
         if (!auth.googleConfigured) return res.redirect('/login?error=google_disabled');
+        const expectedState = req.session ? req.session.oauthState : null;
+        if (req.session) delete req.session.oauthState; // single use
+        const gotState = typeof req.query.state === 'string' ? req.query.state : '';
+        if (!expectedState || gotState !== expectedState) {
+            datastore.logEvent('login_fail', { ...reqMeta(req), data: { reason: 'oauth_state' } });
+            return res.redirect('/login?error=oauth');
+        }
         auth.passport.authenticate('google', { session: false }, (err, user, info) => {
             const meta = reqMeta(req);
             if (err) {
@@ -332,30 +405,53 @@ app.get('/auth/google/callback',
     }
 );
 
-// Logout
+// Logout — POST only. A GET that destroys the session is CSRF-able: with
+// SameSite=Lax the cookie still rides top-level cross-site navigations, so a
+// mere link could sign a tech out mid-job.
 app.post('/api/logout', (req, res) => {
     const meta = reqMeta(req);
     datastore.logEvent('logout', meta);
     req.session.destroy(() => {
-        res.redirect('/login');
+        // The no-JS confirmation page below posts a real form, which is a
+        // top-level navigation — answer that with a redirect, or the browser
+        // paints the JSON body as the document. 303 makes it a GET.
+        if (req.accepts(['json', 'html']) === 'html') return res.redirect(303, '/login');
+        res.json({ success: true, redirect: '/login' });
     });
 });
-// GET logout for convenience (forms / plain links)
+
+// GET /logout is a confirmation page, not an action — the button POSTs.
 app.get('/logout', (req, res) => {
-    const meta = reqMeta(req);
-    datastore.logEvent('logout', meta);
-    req.session.destroy(() => {
-        res.redirect('/login');
-    });
+    if (!req.user) return res.redirect('/login');
+    res.type('html').send(`<!DOCTYPE html>
+<html lang="en"><head><meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sign out — Marine Tech Pro</title>
+<link rel="stylesheet" href="/css/styles.css"></head>
+<body><div style="max-width:420px;margin:60px auto;padding:24px;text-align:center;">
+<h2 style="margin-bottom:8px;">Sign out?</h2>
+<p style="color:#5a6b7a;margin-bottom:24px;">You'll need to sign in again to use Marine Tech Pro.</p>
+<form method="POST" action="/api/logout">
+<button type="submit" style="padding:14px 28px;font-size:16px;font-weight:600;border:none;border-radius:10px;background:#0B2240;color:#fff;cursor:pointer;">Sign out</button>
+</form>
+<p style="margin-top:20px;"><a href="/" style="color:#5a6b7a;font-size:14px;">Cancel</a></p>
+</div></body></html>`);
 });
 
 // --- SERVE TRULY PUBLIC STATIC ASSETS (CSS, icons only) ---
 // These are non-sensitive and needed for the login page to render properly.
 // Short cache so deploys pick up quickly on techs' phones.
+// Everything revalidates. The domain data files (diagnosticTrees.js,
+// faultcodes.js, engineSpecs.js) carry no content hash in their URL, so a
+// long max-age would keep a corrected fault code or diagnostic step out of a
+// tech's hands for up to a day — and would also defeat the service worker's
+// background revalidation, which fetches through the HTTP cache.
+// Offline speed comes from the service worker, not from HTTP staleness.
+// `private` because these assets sit behind session auth.
 const staticOpts = {
     setHeaders: (res, filePath) => {
         if (/\.(html|js|css)$/i.test(filePath)) {
-            res.setHeader('Cache-Control', 'no-cache, must-revalidate');
+            res.setHeader('Cache-Control', 'private, no-cache, must-revalidate');
         }
     }
 };
@@ -410,7 +506,7 @@ app.post('/api/admin/users/:id/role', requireAdmin, (req, res) => {
     // Guardrail: prevent break-glass admins (no user id) from demoting themselves — n/a.
     // Guardrail: a real admin cannot demote the LAST real admin (themselves included).
     if (target.role === 'admin' && role !== 'admin') {
-        const adminCount = datastore.listUsers({ limit: 500 }).filter(u => u.role === 'admin').length;
+        const adminCount = datastore.countAdmins();
         if (adminCount <= 1) {
             return res.status(409).json({ success: false, message: 'Cannot demote the last admin.' });
         }
@@ -437,7 +533,7 @@ app.post('/api/admin/users/:id/delete', requireAdmin, (req, res) => {
     const target = datastore.getUserById(id);
     if (!target) return res.status(404).json({ success: false, message: 'User not found' });
     if (target.role === 'admin') {
-        const adminCount = datastore.listUsers({ limit: 500 }).filter(u => u.role === 'admin').length;
+        const adminCount = datastore.countAdmins();
         if (adminCount <= 1) {
             return res.status(409).json({ success: false, message: 'Cannot delete the last admin.' });
         }
@@ -536,9 +632,12 @@ const beaconLimiter = rateLimit({ windowMs: 60 * 1000, max: 120, standardHeaders
 app.post('/api/event', beaconLimiter, (req, res) => {
     const kind = (req.body.kind || '').toString().slice(0, 48);
     const data = req.body.data && typeof req.body.data === 'object' ? req.body.data : null;
+    // NOTE: no 'error' here. Client-reported errors are logged as
+    // 'client_error' so they can't be forged into the admin dashboard's
+    // server-error panel (getErrors reads 'error'/'login_fail'/'ai_error').
     const ALLOWED = new Set([
         'tree_start', 'tree_complete', 'tree_resolve', 'fault_lookup',
-        'spec_view', 'ai_open', 'ai_close', 'error'
+        'spec_view', 'ai_open', 'ai_close', 'client_error'
     ]);
     if (!ALLOWED.has(kind)) return res.status(400).json({ success: false });
     datastore.logEvent(kind, { ...reqMeta(req), data });
@@ -564,23 +663,31 @@ const anthropicClient = ANTHROPIC_API_KEY
     ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, timeout: 60 * 1000, maxRetries: 1 })
     : null;
 
-// Load knowledge base once at startup for grounding the model
+// Load knowledge base once at startup for grounding the model.
+// A missing KB file must NOT take the whole app down — auth, diagnostics and
+// fault-code lookup don't need it. On failure KB stays null and only
+// /api/ask degrades to 503, mirroring the missing-API-key path.
 function loadKB() {
     const dir = path.join(__dirname, 'public', 'js');
-    const kb = {
-        trees: fs.readFileSync(path.join(dir, 'diagnosticTrees.js'), 'utf8'),
-        specs: fs.readFileSync(path.join(dir, 'engineSpecs.js'), 'utf8'),
-        codes: fs.readFileSync(path.join(dir, 'faultcodes.js'), 'utf8')
-    };
-    // Optional Yamaha factory service manual reference corpus.
-    // Loaded when present; ignored if the file isn't on disk so the
-    // server still starts cleanly in minimal deployments.
     try {
-        kb.yamahaManuals = fs.readFileSync(path.join(dir, 'yamahaManuals.js'), 'utf8');
-    } catch (e) {
-        kb.yamahaManuals = '';
+        const kb = {
+            trees: fs.readFileSync(path.join(dir, 'diagnosticTrees.js'), 'utf8'),
+            specs: fs.readFileSync(path.join(dir, 'engineSpecs.js'), 'utf8'),
+            codes: fs.readFileSync(path.join(dir, 'faultcodes.js'), 'utf8')
+        };
+        // Optional Yamaha factory service manual corpus. Lives in kb/ rather
+        // than public/js/ because no page loads it — it is prompt grounding
+        // only, and shipping it to browsers wasted bandwidth.
+        try {
+            kb.yamahaManuals = fs.readFileSync(path.join(__dirname, 'kb', 'yamahaManuals.js'), 'utf8');
+        } catch (e) {
+            kb.yamahaManuals = '';
+        }
+        return kb;
+    } catch (err) {
+        console.error('FATAL-ish: knowledge base failed to load — /api/ask will return 503:', err.message);
+        return null;
     }
-    return kb;
 }
 const KB = loadKB();
 
@@ -611,6 +718,10 @@ app.post('/api/ask', askLimiter, async (req, res) => {
     if (!anthropicClient) {
         datastore.logEvent('ai_error', { ...meta, data: { reason: 'no_api_key' } });
         return res.status(503).json({ success: false, message: 'AI assistant not configured (ANTHROPIC_API_KEY missing).' });
+    }
+    if (!KB) {
+        datastore.logEvent('ai_error', { ...meta, data: { reason: 'no_kb' } });
+        return res.status(503).json({ success: false, message: 'AI assistant unavailable (knowledge base failed to load).' });
     }
     const question = (req.body.question || '').toString().trim();
     if (!question) return res.status(400).json({ success: false, message: 'Question required.' });
@@ -683,7 +794,62 @@ app.post('/api/ask', askLimiter, async (req, res) => {
     }
 });
 
-app.listen(PORT, () => {
+// --- 404 + ERROR HANDLING (must be last) ---
+
+// JSON 404 for API paths so fetch().json() callers get the standard shape.
+app.use('/api', (req, res) => {
+    res.status(404).json({ success: false, message: 'Not found' });
+});
+
+// Terminal error handler. Without this, Express's default handler returns an
+// HTML error page (with a stack trace when NODE_ENV isn't 'production') to
+// clients that always parse JSON, and nothing lands in the events table that
+// the admin dashboard's error panel reads.
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const isApi = (req.originalUrl || '').startsWith('/api/');
+    const badBody = err.type === 'entity.parse.failed' || err.status === 400;
+    const status = badBody ? 400 : (err.status && err.status < 500 ? err.status : 500);
+
+    console.error(`Error ${status} on ${req.method} ${req.originalUrl}:`, err.message);
+    // Only genuine server faults go in as kind 'error' — that's what the admin
+    // dashboard's error panel reads. Client-caused 4xx (malformed JSON etc.)
+    // log under a separate kind so they can't drown out real failures.
+    datastore.logEvent(status >= 500 ? 'error' : 'bad_request', {
+        ...reqMeta(req),
+        data: { where: 'express', path: (req.originalUrl || '').slice(0, 200), msg: err.message, status }
+    });
+
+    if (isApi) {
+        return res.status(status).json({
+            success: false,
+            message: badBody ? 'Malformed request body.' : 'Server error'
+        });
+    }
+    res.status(status).type('text').send(badBody ? 'Bad request' : 'Server error');
+});
+
+// Last-resort process guards. These LOG and then EXIT — installing a listener
+// that only logs would suppress Node's default crash behaviour and leave a
+// process running in an undefined state while /api/health still answers "ok",
+// so the platform never restarts it. Recording the event first means the
+// admin dashboard's error panel shows why it went down.
+process.on('unhandledRejection', (reason) => {
+    console.error('Unhandled rejection:', reason);
+    try {
+        datastore.logEvent('error', { data: { where: 'unhandledRejection', msg: String((reason && reason.message) || reason).slice(0, 500) } });
+    } catch (_) {}
+    shutdown('unhandledRejection', 1);
+});
+process.on('uncaughtException', (err) => {
+    console.error('Uncaught exception:', err);
+    try {
+        datastore.logEvent('error', { data: { where: 'uncaughtException', msg: err.message } });
+    } catch (_) {}
+    shutdown('uncaughtException', 1);
+});
+
+const server = app.listen(PORT, () => {
     console.log(`Marine Tech Pro running on port ${PORT}`);
     console.log(`DB at ${datastore.DB_PATH}`);
     if (!auth.googleConfigured) {
@@ -697,4 +863,52 @@ app.listen(PORT, () => {
     if (!ADMIN_CODE) {
         console.warn('NOTE: ADMIN_CODE not set — break-glass admin login is disabled.');
     }
+    if (!process.env.IP_HASH_SALT) {
+        console.warn('NOTE: IP_HASH_SALT not set — audit-log IP hashes use a source-visible default salt.');
+    }
+    if (!KB) {
+        console.warn('NOTE: knowledge base did not load — Ask-a-Tech will return 503.');
+    }
+    // Trim telemetry now and daily.
+    datastore.startRetentionJob();
 });
+
+// Graceful shutdown: Railway sends SIGTERM on every redeploy. Drain in-flight
+// requests (an /api/ask call can run tens of seconds) and close SQLite so the
+// WAL is checkpointed instead of left for recovery on next boot.
+// Sized to sit inside a typical platform SIGKILL grace window. Note the AI
+// client's own budget (60s timeout, 1 retry) can exceed this: a tech's
+// in-flight question may be cut short on redeploy. Raise DRAIN_TIMEOUT_MS if
+// the platform grants a longer grace period.
+const DRAIN_TIMEOUT_MS = Number(process.env.DRAIN_TIMEOUT_MS || 25000);
+
+let shuttingDown = false;
+function shutdown(signal, code = 0) {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    console.log(`${signal} received — draining connections…`);
+
+    const closeDb = () => {
+        try { datastore.db.close(); } catch (e) { console.warn('DB close failed:', e.message); }
+    };
+
+    // A timed-out drain is an expected outcome, not a crash — exit with the
+    // caller's code so a clean redeploy isn't reported as a failure. Close
+    // SQLite on this path too, so the WAL is checkpointed either way.
+    const force = setTimeout(() => {
+        console.warn('Drain timed out — exiting.');
+        closeDb();
+        process.exit(code);
+    }, DRAIN_TIMEOUT_MS);
+    force.unref();
+
+    server.close(() => {
+        closeDb();
+        console.log('Shutdown complete.');
+        process.exit(code);
+    });
+    // Don't let idle keep-alive sockets hold the drain open.
+    if (typeof server.closeIdleConnections === 'function') server.closeIdleConnections();
+}
+process.on('SIGTERM', () => shutdown('SIGTERM'));
+process.on('SIGINT', () => shutdown('SIGINT'));

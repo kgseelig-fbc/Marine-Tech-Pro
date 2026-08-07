@@ -88,11 +88,8 @@
     </main>
 
     <script>
-    function logoutMTP() {
-        fetch('/api/logout', { method: 'POST' }).then(function() {
-            window.location.replace('/login');
-        });
-    }
+    // Shared implementation lives in js/common.js (MTP.logout).
+    function logoutMTP() { if (window.MTP) MTP.logout(); }
     // Reveal the Admin dashboard link only if this user is an admin.
     fetch('/api/me').then(function(r){ return r.json(); }).then(function(m){
         if (m.authenticated && m.user && m.user.role === 'admin') {
@@ -100,7 +97,8 @@
         }
     }).catch(function(){});
     </script>
-    <script src="/js/askTech.js?v=2"></script>
-    <script src="/js/feedback.js?v=2"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/askTech.js"></script>
+    <script src="/js/feedback.js"></script>
 </body>
 </html>
