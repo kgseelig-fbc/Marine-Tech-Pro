@@ -366,9 +366,8 @@
 </div>
 
 <script>
-function logout() {
-    fetch('/api/logout', { method: 'POST' }).then(function() { window.location.replace('/login'); });
-}
+// Shared implementation lives in js/common.js (MTP.logout).
+function logout() { if (window.MTP) MTP.logout(); }
 
 function fmtTime(ts) {
     var d = new Date(ts);
@@ -788,5 +787,6 @@ function load() {
 load();
 setInterval(load, 30000);
 </script>
+    <script src="/js/common.js"></script>
 </body>
 </html>

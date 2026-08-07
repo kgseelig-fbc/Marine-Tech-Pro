@@ -1,0 +1,36 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+
+      - run: npm ci
+
+      # Syntax check every server-side file.
+      - name: Syntax check
+        run: node --check server.js && node --check lib/db.js && node --check lib/auth.js
+
+      # Validates the hand-maintained diagnostic trees, fault codes and specs:
+      # broken node references and dead ends are otherwise invisible until a
+      # technician hits one in the field.
+      - name: Validate domain data
+        run: npm run validate
+
+      - name: Tests
+        run: node --test test/*.test.js
+
+      # Fails on high/critical only — moderates are reported but don't block.
+      - name: Audit production dependencies
+        run: npm audit --omit=dev --audit-level=high

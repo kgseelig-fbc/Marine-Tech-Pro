@@ -1,8 +1,17 @@
 {
   "name": "marine-tech-pro",
   "version": "1.0.0",
+  "private": true,
+  "description": "Field diagnostic and repair assistant for Freedom Boat Club marine technicians",
+  "license": "UNLICENSED",
+  "engines": {
+    "node": ">=20 <23"
+  },
   "scripts": {
-    "start": "node server.js"
+    "start": "node server.js",
+    "test": "npm run validate && node --test test/*.test.js",
+    "validate": "node scripts/validate-data.js",
+    "check": "node --check server.js && node --check lib/db.js && node --check lib/auth.js && npm run validate"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.90.0",

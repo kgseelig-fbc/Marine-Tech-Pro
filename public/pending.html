@@ -91,8 +91,12 @@
 <script>
 function $(id){ return document.getElementById(id); }
 
+// Deliberately self-contained: /js/common.js sits behind requireAuth, which
+// bounces pending users to /pending, so MTP is NEVER available on this page.
+// This is the only exit from a dead-end screen — it must not depend on it.
 function signOut() {
-    fetch('/api/logout', { method: 'POST' })
+    fetch('/api/logout', { method: 'POST', credentials: 'same-origin' })
+        .catch(function(){})
         .finally(function(){ window.location.replace('/login'); });
 }
 

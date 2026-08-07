@@ -226,6 +226,8 @@ img { max-width: 100%; display: block; }
 }
 
 /* --- MENU CARDS (home & diagnose menu) --- */
+/* Also used on <button> and <a> elements — reset their UA styling so the
+   card looks identical whichever element it is, and stays keyboard-usable. */
 .menu-card {
     display: flex;
     align-items: center;
@@ -238,10 +240,26 @@ img { max-width: 100%; display: block; }
     min-height: 72px;
     cursor: pointer;
     transition: transform .08s ease, box-shadow .15s ease, border-color .15s ease;
+    width: 100%;
+    text-align: left;
+    font: inherit;
+    color: inherit;
+    -webkit-appearance: none;
+    appearance: none;
 }
 
 .menu-card:hover { box-shadow: var(--shadow-md); border-color: #D9E0EC; }
 .menu-card:active { transform: scale(.99); }
+
+/* Visible keyboard focus everywhere it matters (gloves, switch devices). */
+.menu-card:focus-visible,
+.fault-card:focus-visible,
+button:focus-visible,
+a:focus-visible,
+[role="button"]:focus-visible {
+    outline: 3px solid #2AB7D1;
+    outline-offset: 2px;
+}
 
 .menu-icon {
     width: 48px;

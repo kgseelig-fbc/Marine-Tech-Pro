@@ -46,27 +46,29 @@
             top: 50%;
             transform: translateY(-50%);
             font-size: 18px;
-            color: #95a5a6;
+            color: #667883;
         }
 
         .search-clear {
             position: absolute;
-            right: 14px;
+            right: 8px;
             top: 50%;
             transform: translateY(-50%);
-            background: #ddd;
+            background: transparent;
             border: none;
             border-radius: 50%;
-            width: 24px;
-            height: 24px;
-            font-size: 14px;
-            color: #666;
+            /* 44px minimum touch target — wet hands, gloves, moving boat. */
+            width: 44px;
+            height: 44px;
+            font-size: 16px;
+            color: #5a6b75;
             cursor: pointer;
             display: none;
             align-items: center;
             justify-content: center;
             line-height: 1;
         }
+        .search-clear:hover { background: #eef1f4; }
 
         .filter-row {
             display: flex;
@@ -96,7 +98,7 @@
         .results-count {
             margin: 0 16px 12px;
             font-size: 13px;
-            color: #95a5a6;
+            color: #667883;
             font-weight: 600;
         }
 
@@ -153,7 +155,7 @@
 
         .fault-brand {
             font-size: 12px;
-            color: #95a5a6;
+            color: #667883;
             margin-top: 2px;
         }
 
@@ -223,7 +225,7 @@
         .no-results {
             text-align: center;
             padding: 40px 20px;
-            color: #95a5a6;
+            color: #667883;
         }
 
         .no-results-icon {
@@ -249,12 +251,15 @@
         }
 
         .sev-filter {
-            padding: 6px 12px;
+            /* Was ~29px tall — under the 44px touch minimum for field use. */
+            min-height: 44px;
+            padding: 10px 16px;
             border: 1px solid #ddd;
-            border-radius: 16px;
+            border-radius: 22px;
             background: #fff;
-            font-size: 12px;
+            font-size: 13px;
             font-weight: 600;
+            color: #34495e;
             cursor: pointer;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
         }
@@ -355,16 +360,21 @@
 
     function toggleCard(id) {
         var card = document.getElementById(id);
-        card.classList.toggle('expanded');
+        var open = card.classList.toggle('expanded');
+        card.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+
+    // Cards are role="button" — Enter and Space must activate them.
+    function cardKey(e, id) {
+        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
+            e.preventDefault();
+            toggleCard(id);
+        }
     }
 
     var _faultSearchTimer = null;
-    function mtpBeacon(kind, data) {
-        try {
-            fetch('/api/event', { method:'POST', headers:{'Content-Type':'application/json'},
-                body: JSON.stringify({ kind: kind, data: data || null }), keepalive: true }).catch(function(){});
-        } catch(_){}
-    }
+    // Shared implementation lives in js/common.js (MTP.beacon).
+    function mtpBeacon(kind, data) { if (window.MTP) MTP.beacon(kind, data); }
 
     function renderResults() {
         var query = document.getElementById('searchInput').value.trim().toLowerCase();
@@ -414,7 +424,9 @@
             var causes = (fc.causes || '').split('|').filter(Boolean);
             var steps = (fc.steps || '').split('|').filter(Boolean);
 
-            html += '<div class="fault-card" id="' + cardId + '" onclick="toggleCard(\'' + cardId + '\')">';
+            html += '<div class="fault-card" id="' + cardId + '" role="button" tabindex="0"'
+                  + ' aria-expanded="false" onclick="toggleCard(\'' + cardId + '\')"'
+                  + ' onkeydown="cardKey(event, \'' + cardId + '\')">';
             html += '<div class="fault-header">';
             html += '<span class="fault-code-badge ' + esc(brand) + '">' + esc(fc.code) + '</span>';
             html += '<div class="fault-summary">';
@@ -471,8 +483,9 @@
     renderResults();
 
     </script>
-    <script src="js/askTech.js?v=2"></script>
-    <script src="js/feedback.js?v=2"></script>
+    <script src="/js/common.js"></script>
+    <script src="/js/askTech.js"></script>
+    <script src="/js/feedback.js"></script>
 
 </body>
 </html>
