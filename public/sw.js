@@ -19,7 +19,7 @@
 //
 // Bump CACHE_VERSION whenever the precache list or caching logic changes.
 
-var CACHE_VERSION = 'mtp-v2';
+var CACHE_VERSION = 'mtp-v3';
 
 // Core shell — if these are missing, offline is useless.
 var CORE = [
@@ -35,6 +35,7 @@ var EXTRA = [
     '/fault-codes.html',
     '/specs.html',
     '/icons/sprite.svg',
+    '/icons/logo-256.png',
     '/js/common.js',
     '/js/askTech.js',
     '/js/feedback.js',
@@ -55,6 +56,7 @@ function isCacheable(req, res) {
     if (/\.css$/i.test(path)) return ct.indexOf('text/css') !== -1;
     if (/\.json$/i.test(path)) return ct.indexOf('json') !== -1;
     if (/\.(svg)$/i.test(path)) return ct.indexOf('svg') !== -1;
+    if (/\.(png|jpe?g|webp|gif|ico)$/i.test(path)) return ct.indexOf('image/') !== -1;
     // HTML pages: make sure we didn't get redirected to an auth page.
     if (isHtmlRequest(req)) return ct.indexOf('text/html') !== -1;
     return true;
