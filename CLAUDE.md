@@ -87,6 +87,8 @@ Exposes `window.MTP`: `beacon(kind, data)` (POSTs `/api/event`), `logout()` (POS
 
 Service worker precaches the app shell and the three data files. `/api/*` is never cached; HTML is network-first (so deploys land immediately); JS/CSS/icons are stale-while-revalidate. Bump `CACHE_VERSION` when the precache list changes.
 
+**Cache generations are load-bearing.** `activate()` deliberately keeps the previous generation when the new install is incomplete — an expired session cookie is enough, since every precache then follows the auth 302 and is rejected by `isCacheable` — so two caches can legitimately coexist. Because `caches.match()` with no `cacheName` scans **every** cache in creation order and returns the first hit, all reads go through `matchCurrent()` (scoped to `CACHE_VERSION`). Older generations are consulted only via `matchAnyGeneration()` as an offline last resort. Read unscoped and a retained older cache shadows the new one forever while writes land where nothing reads them — a tech keeps being served pre-deploy fault codes. `test/sw.test.js` guards this. Install completeness is recorded as a sentinel entry *inside* the cache, not on `self`, so it survives the worker being killed between `install` and `activate`. Anything a tech opens offline belongs in `CORE`, not `EXTRA`: a cache missing a `CORE` entry is not allowed to replace a good one.
+
 ### Icons (`public/icons/`, `assets/`)
 
 The high-res master is `assets/fbc-logo-master.jpeg` (2000×2000) and lives **outside `public/`** so it is never served — it exists only to regenerate the icon set. `scripts/generate-icons.js` derives every shipped icon from it via sharp, which is deliberately *not* a dependency (install it with `--no-save` when regenerating; the generated PNGs are committed).

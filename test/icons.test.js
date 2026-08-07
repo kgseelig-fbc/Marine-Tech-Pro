@@ -59,10 +59,47 @@ describe('manifest icons', () => {
         }
     });
 
-    test('icons are small enough to ship to a phone on cell data', () => {
-        for (const icon of manifest.icons) {
-            const bytes = fs.statSync(publicPath(icon.src)).size;
-            assert.ok(bytes < 150 * 1024, `${icon.src} is ${bytes} B — too large for an icon`);
+    // The original defect lived in the FAVICON, not the manifest — a 474 KB
+    // JPEG pulled on every page load. Budget every shipped raster icon,
+    // wherever it is referenced from, not just the four manifest entries.
+    test('every shipped raster icon is a real PNG within a sane byte budget', () => {
+        const referenced = new Set(manifest.icons.map((i) => i.src));
+
+        for (const page of fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))) {
+            const html = fs.readFileSync(path.join(PUBLIC, page), 'utf8');
+            for (const m of html.matchAll(/(?:href|src)=(["'])((?:\/)?icons\/[^"']+)\1/g)) {
+                referenced.add('/' + m[2].replace(/^\//, ''));
+            }
+        }
+        const sw = fs.readFileSync(path.join(PUBLIC, 'sw.js'), 'utf8');
+        for (const m of sw.matchAll(/["'](\/icons\/[^"']+)["']/g)) referenced.add(m[1]);
+
+        const rasters = [...referenced].map((r) => r.split('#')[0]).filter((r) => !r.endsWith('.svg'));
+        assert.ok(rasters.length >= 5, `expected the full icon set, found ${rasters.length}`);
+
+        for (const ref of rasters) {
+            const file = publicPath(ref);
+            assert.ok(fs.existsSync(file), `${ref} is referenced but missing`);
+            pngSize(file); // also asserts the PNG magic number
+            const bytes = fs.statSync(file).size;
+            assert.ok(bytes < 80 * 1024, `${ref} is ${bytes} B — too large to ship on cell data`);
+        }
+    });
+
+    test('no icon in the served directory is orphaned', () => {
+        const referenced = new Set(manifest.icons.map((i) => i.src.replace('/icons/', '')));
+        const all = [
+            ...fs.readdirSync(PUBLIC).filter((f) => f.endsWith('.html'))
+                .map((p) => fs.readFileSync(path.join(PUBLIC, p), 'utf8')),
+            fs.readFileSync(path.join(PUBLIC, 'sw.js'), 'utf8'),
+            fs.readFileSync(path.join(PUBLIC, 'css', 'styles.css'), 'utf8')
+        ].join('\n');
+
+        for (const file of fs.readdirSync(path.join(PUBLIC, 'icons'))) {
+            assert.ok(
+                referenced.has(file) || all.includes(file),
+                `public/icons/${file} is not referenced anywhere — dead weight in the deploy`
+            );
         }
     });
 });
@@ -74,7 +111,8 @@ describe('page icon references', () => {
         assert.ok(pages.length > 0, 'no HTML pages found');
         for (const page of pages) {
             const html = fs.readFileSync(path.join(PUBLIC, page), 'utf8');
-            const refs = [...html.matchAll(/(?:href|src)="(\/icons\/[^"]+)"/g)].map((m) => m[1]);
+            // Accept either quote style — anchoring to one silently skips the other.
+            const refs = [...html.matchAll(/(?:href|src)=(["'])(\/icons\/[^"']+)\1/g)].map((m) => m[2]);
             for (const ref of refs) {
                 // sprite.svg is referenced with #fragment ids for <use>.
                 const clean = ref.split('#')[0];
@@ -112,16 +150,43 @@ describe('service worker icon precache', () => {
     const sw = fs.readFileSync(path.join(PUBLIC, 'sw.js'), 'utf8');
 
     test('every precached /icons/ URL exists on disk', () => {
-        const refs = [...sw.matchAll(/'(\/icons\/[^']+)'/g)].map((m) => m[1]);
+        const refs = [...sw.matchAll(/["'](\/icons\/[^"']+)["']/g)].map((m) => m[1]);
         assert.ok(refs.length > 0, 'no icons precached');
         for (const ref of refs) {
             assert.ok(fs.existsSync(publicPath(ref)), `sw.js precaches ${ref} which does not exist`);
         }
     });
 
-    test('image responses are content-type checked before caching', () => {
-        // Without this guard an HTML error body served under a .png URL would
-        // be cached as if it were the icon.
-        assert.match(sw, /png\|jpe\?g/, 'isCacheable has no image content-type guard');
+    // Assert the BEHAVIOUR, not the source text: grepping for the regex would
+    // still pass if the guard were deleted and only a comment left behind.
+    test('an HTML body served under a .png URL is not cached as the icon', () => {
+        const vm = require('node:vm');
+        const sandbox = {
+            self: { addEventListener() {}, location: { origin: 'https://app.example.com' } },
+            caches: { open: () => Promise.resolve({}), keys: () => Promise.resolve([]) },
+            fetch: () => Promise.resolve(),
+            URL,
+            Request: class { constructor(u, o) { this.url = u; Object.assign(this, o || {}); } },
+            Response: class { constructor(b, i) { this.body = b; Object.assign(this, i || {}); } },
+            Promise,
+            console
+        };
+        vm.createContext(sandbox);
+        vm.runInContext(sw, sandbox, { filename: 'sw.js' });
+        const isCacheable = vm.runInContext('isCacheable', sandbox);
+
+        const req = (u) => ({ url: u, mode: 'no-cors', headers: { get: () => '*/*' } });
+        const res = (ct) => ({ ok: true, type: 'basic', redirected: false, headers: { get: () => ct } });
+
+        assert.equal(
+            isCacheable(req('https://app.example.com/icons/icon-192.png'), res('text/html; charset=UTF-8')),
+            false,
+            'an HTML error page would be cached and served as the app icon'
+        );
+        assert.equal(
+            isCacheable(req('https://app.example.com/icons/icon-192.png'), res('image/png')),
+            true,
+            'a genuine PNG must still be cacheable'
+        );
     });
 });

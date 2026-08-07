@@ -64,9 +64,10 @@ const TARGETS = [
 async function build(name, size, maskable) {
     const dest = path.join(OUT_DIR, name);
     let img;
+    let inner = size;
 
     if (maskable) {
-        const inner = Math.round(size * BADGE_SCALE);
+        inner = Math.round(size * BADGE_SCALE);
         const pad = size - inner;
         const left = Math.floor(pad / 2);
         const top = Math.floor(pad / 2);
@@ -85,26 +86,32 @@ async function build(name, size, maskable) {
 
     // flatten(): the master is JPEG (no alpha), but flattening guarantees a
     // fully opaque result even if the master is ever replaced with a PNG/SVG.
-    await img.flatten({ background: PAD_COLOR }).png(PNG_OPTS).toFile(dest);
+    //
+    // Render to a BUFFER and verify before touching the filesystem — writing
+    // first would leave a croppable icon on disk (and in the next commit) when
+    // the safe-zone assertion fails.
+    const buf = await img.flatten({ background: PAD_COLOR }).png(PNG_OPTS).toBuffer();
 
-    const meta = await sharp(dest).metadata();
-    const bytes = fs.statSync(dest).size;
+    const meta = await sharp(buf).metadata();
     if (meta.width !== size || meta.height !== size) {
         throw new Error(`${name}: expected ${size}x${size}, got ${meta.width}x${meta.height}`);
     }
 
     let margin = null;
     if (maskable) {
-        margin = await assertInsideSafeZone(dest, name);
+        margin = await assertInsideSafeZone(buf, name, inner);
     }
-    return { name, size, maskable, bytes, margin, dims: `${meta.width}x${meta.height}` };
+
+    fs.writeFileSync(dest, buf);
+    return { name, size, maskable, bytes: buf.length, margin, dims: `${meta.width}x${meta.height}` };
 }
 
-// Verify no ink lands outside the maskable safe zone. Cheap insurance against
-// a bad BADGE_SCALE silently shipping an icon whose wordmark gets cropped —
-// which is the exact defect these variants exist to prevent.
-async function assertInsideSafeZone(file, name) {
-    const { data, info } = await sharp(file).raw().toBuffer({ resolveWithObject: true });
+// Verify the badge lands inside the maskable safe zone — and that it actually
+// fills it. Cheap insurance against a bad BADGE_SCALE shipping an icon whose
+// wordmark gets cropped, which is the exact defect these variants exist to
+// prevent, and against a silently letterboxed badge floating in white space.
+async function assertInsideSafeZone(buf, name, inner) {
+    const { data, info } = await sharp(buf).raw().toBuffer({ resolveWithObject: true });
     const { width: w, height: h, channels } = info;
     const cx = (w - 1) / 2;
     const cy = (h - 1) / 2;
@@ -127,6 +134,16 @@ async function assertInsideSafeZone(file, name) {
             `is r=${safeR.toFixed(1)}px — a mask would crop the wordmark. Lower BADGE_SCALE.`
         );
     }
+    // Two-sided: a badge much smaller than requested means the resize
+    // letterboxed it (e.g. a non-square master), which the upper bound alone
+    // would happily report as a comfortable margin.
+    const expectedR = inner / 2;
+    if (maxD < expectedR * 0.95) {
+        throw new Error(
+            `${name}: badge only reaches r=${maxD.toFixed(1)}px but should reach ~${expectedR.toFixed(1)}px ` +
+            `— it was letterboxed, not scaled. Check the master's aspect ratio.`
+        );
+    }
     return safeR - maxD;
 }
 
@@ -139,6 +156,15 @@ async function assertInsideSafeZone(file, name) {
 
     const master = await sharp(MASTER).metadata();
     console.log(`master: ${master.width}x${master.height} ${master.format}, ${fs.statSync(MASTER).size} bytes\n`);
+
+    // Every target is square. A non-square master would be letterboxed by
+    // fit:'contain', silently producing undersized badges on a white slab.
+    if (master.width !== master.height) {
+        throw new Error(
+            `master artwork must be square, got ${master.width}x${master.height} — ` +
+            `a non-square master gets letterboxed into every icon.`
+        );
+    }
 
     const rows = [];
     for (const [name, size, maskable] of TARGETS) {
