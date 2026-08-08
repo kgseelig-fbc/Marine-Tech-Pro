@@ -15,7 +15,7 @@
     "check": "node --check server.js && node --check lib/db.js && node --check lib/auth.js && npm run validate"
   },
   "dependencies": {
-    "@anthropic-ai/sdk": "^0.90.0",
+    "@anthropic-ai/sdk": "^0.116.0",
     "bcryptjs": "^3.0.3",
     "better-sqlite3": "^12.9.0",
     "better-sqlite3-session-store": "^0.1.0",
