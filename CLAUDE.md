@@ -10,7 +10,7 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 
 - **Install dependencies:** `npm install`
 - **Run the server:** `npm start` (runs `node server.js` on port 3000)
-- **Run tests:** `npm test` (validates domain data, then runs the auth-gating suite in `test/` via `node --test`)
+- **Run tests:** `npm test` (validates domain data, then runs the suites in `test/` via `node --test`). No API key or network needed — `test/ask.test.js` points the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL` and asserts the exact request the SDK sends, so an SDK upgrade can't silently change the AI contract (notably the 1h prompt-cache breakpoint — losing it re-pays a ~100K-token cache write on every question, with no error to notice).
 - **Validate data only:** `npm run validate` (checks diagnostic-tree graph integrity, fault-code schema, menu coverage)
 - **Syntax + data check:** `npm run check`
 - **Regenerate app icons:** `npm install --no-save sharp && npm run icons` (only needed when the master artwork changes — see "Icons" below)
