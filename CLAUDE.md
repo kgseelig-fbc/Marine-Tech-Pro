@@ -13,6 +13,7 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 - **Run tests:** `npm test` (validates domain data, then runs the auth-gating suite in `test/` via `node --test`)
 - **Validate data only:** `npm run validate` (checks diagnostic-tree graph integrity, fault-code schema, menu coverage)
 - **Syntax + data check:** `npm run check`
+- **Regenerate app icons:** `npm install --no-save sharp && npm run icons` (only needed when the master artwork changes — see "Icons" below)
 - **Environment variables:** `PORT`, `ADMIN_CODE` (break-glass admin login), `SESSION_SECRET`, `NODE_ENV`, `ANTHROPIC_API_KEY` (Ask-a-Tech AI), `DATA_DIR` (SQLite location — defaults to `/data` if present else `./data`), `FBC_HUB_URL` (defaults to `https://freedomboatclub.ai`), `IP_HASH_SALT`, `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `BASE_URL` (e.g. `https://marinetech.freedomboatclub.ai` — used to build the Google OAuth callback URL), `INITIAL_ADMIN_EMAILS` (comma-separated list; matching emails are auto-approved as admin on first **Google** sign-in only — local signups never bootstrap to admin because their email is unverified)
 
 Also honoured: `RETENTION_DAYS` (telemetry pruning window, default 90).
@@ -85,6 +86,18 @@ Exposes `window.MTP`: `beacon(kind, data)` (POSTs `/api/event`), `logout()` (POS
 ### Offline (`public/sw.js`)
 
 Service worker precaches the app shell and the three data files. `/api/*` is never cached; HTML is network-first (so deploys land immediately); JS/CSS/icons are stale-while-revalidate. Bump `CACHE_VERSION` when the precache list changes.
+
+**Cache generations are load-bearing.** `activate()` deliberately keeps the previous generation when the new install is incomplete — an expired session cookie is enough, since every precache then follows the auth 302 and is rejected by `isCacheable` — so two caches can legitimately coexist. Because `caches.match()` with no `cacheName` scans **every** cache in creation order and returns the first hit, all reads go through `matchCurrent()` (scoped to `CACHE_VERSION`). Older generations are consulted only via `matchAnyGeneration()` as an offline last resort. Read unscoped and a retained older cache shadows the new one forever while writes land where nothing reads them — a tech keeps being served pre-deploy fault codes. `test/sw.test.js` guards this. Install completeness is recorded as a sentinel entry *inside* the cache, not on `self`, so it survives the worker being killed between `install` and `activate`. Anything a tech opens offline belongs in `CORE`, not `EXTRA`: a cache missing a `CORE` entry is not allowed to replace a good one.
+
+### Icons (`public/icons/`, `assets/`)
+
+The high-res master is `assets/fbc-logo-master.jpeg` (2000×2000) and lives **outside `public/`** so it is never served — it exists only to regenerate the icon set. `scripts/generate-icons.js` derives every shipped icon from it via sharp, which is deliberately *not* a dependency (install it with `--no-save` when regenerating; the generated PNGs are committed).
+
+Two manifest icon families, and the distinction matters:
+- **`purpose: "any"`** (`icon-192/512.png`) — full-bleed. Nothing crops these.
+- **`purpose: "maskable"`** (`icon-maskable-192/512.png`) — the badge is drawn at 78% and padded with white to the edges. Android crops maskable icons to a platform-chosen shape (circle, squircle, teardrop) and only a centred circle of 80% diameter is guaranteed to survive. The FBC badge carries the "FREEDOM BOAT CLUB" wordmark on its rim, so a full-bleed maskable icon would have that text sliced off by every mask. The generator **asserts** no ink escapes the safe zone and fails rather than emit a croppable icon.
+
+Also derived: `apple-touch-icon.png` (180), `logo-256.png` (in-page brand mark, rendered at 72–78px), and `favicon-16/32.png`. `test/icons.test.js` asserts declared `sizes` match the real PNG headers and that every icon referenced by a page or the service worker exists — the original bug was a single 2000×2000 JPEG declared as both 192×192 and 512×512 and used as the favicon on every page.
 
 ### Styling
 

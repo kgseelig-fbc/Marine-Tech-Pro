@@ -19,27 +19,53 @@
 //
 // Bump CACHE_VERSION whenever the precache list or caching logic changes.
 
-var CACHE_VERSION = 'mtp-v2';
+var CACHE_VERSION = 'mtp-v3';
 
-// Core shell — if these are missing, offline is useless.
+// Core shell — if these are missing, offline is useless. These are the pages
+// and data a tech actually opens on a dock, so a cache missing any of them is
+// not good enough to replace a previous one (see activate()).
 var CORE = [
     '/index.html',
+    '/diagnose.html',
+    '/fault-codes.html',
+    '/specs.html',
     '/css/styles.css',
+    '/js/common.js',
     '/js/diagnosticTrees.js',
     '/js/engineSpecs.js',
     '/js/faultcodes.js'
 ];
 var EXTRA = [
     '/',
-    '/diagnose.html',
-    '/fault-codes.html',
-    '/specs.html',
     '/icons/sprite.svg',
-    '/js/common.js',
+    '/icons/logo-256.png',
     '/js/askTech.js',
     '/js/feedback.js',
     '/manifest.json'
 ];
+
+// Written into a cache only when its core shell is complete. activate() reads
+// it back rather than trusting an in-memory flag, which would not survive the
+// worker being killed between install and activate.
+var CORE_SENTINEL = '/__mtp-core-complete';
+
+// Read scoped to the CURRENT generation.
+//
+// `caches.match(req)` with no cacheName scans every cache in creation order
+// and returns the first hit — so an older generation that activate() kept on
+// purpose would shadow this one on every read, forever, while writes went to
+// the new cache where nothing read them. A tech would keep being served the
+// pre-deploy fault codes. Reads must name the cache; older generations are a
+// last-resort offline fallback only (matchAnyGeneration).
+function matchCurrent(req) {
+    return caches.open(CACHE_VERSION).then(function (c) { return c.match(req); });
+}
+
+// Only for when the network is gone AND the current cache misses: better to
+// hand a tech slightly stale reference data than nothing at all in a dead zone.
+function matchAnyGeneration(req) {
+    return caches.match(req);
+}
 
 // A response is safe to cache only if it is a real, non-redirected,
 // same-origin 200 whose content-type matches what was asked for.
@@ -55,6 +81,7 @@ function isCacheable(req, res) {
     if (/\.css$/i.test(path)) return ct.indexOf('text/css') !== -1;
     if (/\.json$/i.test(path)) return ct.indexOf('json') !== -1;
     if (/\.(svg)$/i.test(path)) return ct.indexOf('svg') !== -1;
+    if (/\.(png|jpe?g|webp|gif|ico)$/i.test(path)) return ct.indexOf('image/') !== -1;
     // HTML pages: make sure we didn't get redirected to an auth page.
     if (isHtmlRequest(req)) return ct.indexOf('text/html') !== -1;
     return true;
@@ -92,22 +119,31 @@ self.addEventListener('install', function (event) {
             // Signed-out or flaky install: activate anyway (runtime
             // stale-while-revalidate will fill the cache once the tech is
             // signed in), but record that the shell is incomplete so
-            // activate() knows not to bin a good previous cache.
-            self.__mtpCoreComplete = got === CORE.length;
-            return self.skipWaiting();
+            // activate() knows not to bin a good previous cache. The marker
+            // is stored IN the cache, not on `self`, so it survives the
+            // worker being torn down between install and activate.
+            if (got !== CORE.length) return self.skipWaiting();
+            return caches.open(CACHE_VERSION).then(function (cache) {
+                return cache.put(CORE_SENTINEL, new Response('1'));
+            }).then(function () { return self.skipWaiting(); });
         })
     );
 });
 
 self.addEventListener('activate', function (event) {
     event.waitUntil(
-        caches.keys().then(function (keys) {
-            var stale = keys.filter(function (k) { return k !== CACHE_VERSION; });
-            // Only bin the previous cache once this one actually holds the
-            // core shell — otherwise a bad-network update leaves a tech with
-            // no offline data at all.
-            if (!self.__mtpCoreComplete) return Promise.resolve();
-            return Promise.all(stale.map(function (k) { return caches.delete(k); }));
+        // Only bin previous generations once THIS one actually holds the core
+        // shell — otherwise a bad-network update leaves a tech with no offline
+        // data at all. Reads are scoped to CACHE_VERSION (matchCurrent), so a
+        // retained old cache costs quota but can never shadow fresh assets.
+        caches.open(CACHE_VERSION).then(function (cache) {
+            return cache.match(CORE_SENTINEL);
+        }).then(function (complete) {
+            if (!complete) return Promise.resolve();
+            return caches.keys().then(function (keys) {
+                var stale = keys.filter(function (k) { return k !== CACHE_VERSION; });
+                return Promise.all(stale.map(function (k) { return caches.delete(k); }));
+            });
         }).then(function () { return self.clients.claim(); })
     );
 });
@@ -135,9 +171,15 @@ self.addEventListener('fetch', function (event) {
                 }
                 return res;
             }).catch(function () {
-                return caches.match(req).then(function (hit) {
+                // Offline: current generation first, then any older one that
+                // activate() deliberately kept, then the shell.
+                return matchCurrent(req).then(function (hit) {
+                    return hit || matchAnyGeneration(req);
+                }).then(function (hit) {
                     if (hit) return hit;
-                    return caches.match('/index.html').then(function (shell) {
+                    return matchCurrent('/index.html').then(function (shell) {
+                        return shell || matchAnyGeneration('/index.html');
+                    }).then(function (shell) {
                         if (shell) return shell;
                         return new Response(
                             '<!DOCTYPE html><meta charset="utf-8"><title>Offline</title>' +
@@ -154,15 +196,24 @@ self.addEventListener('fetch', function (event) {
     }
 
     // Static assets: serve from cache immediately, refresh in background.
+    // matchCurrent, not caches.match — a retained older generation must never
+    // shadow this one, or a corrected fault code never reaches the tech.
     event.respondWith(
-        caches.match(req).then(function (hit) {
+        matchCurrent(req).then(function (hit) {
             var net = fetch(req).then(function (res) {
                 if (isCacheable(req, res)) {
                     var copy = res.clone();
                     event.waitUntil(cachePut(req, copy));
                 }
                 return res;
-            }).catch(function () { return hit; });
+            }).catch(function () {
+                // Offline and not in the current generation — fall back to an
+                // older one activate() kept rather than failing outright.
+                // Never resolve to undefined: respondWith(undefined) throws.
+                return hit || matchAnyGeneration(req).then(function (old) {
+                    return old || new Response('', { status: 504, statusText: 'Offline' });
+                });
+            });
 
             if (hit) {
                 event.waitUntil(net.catch(function () {}));

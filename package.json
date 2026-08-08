@@ -11,6 +11,7 @@
     "start": "node server.js",
     "test": "npm run validate && node --test test/*.test.js",
     "validate": "node scripts/validate-data.js",
+    "icons": "node scripts/generate-icons.js",
     "check": "node --check server.js && node --check lib/db.js && node --check lib/auth.js && npm run validate"
   },
   "dependencies": {
