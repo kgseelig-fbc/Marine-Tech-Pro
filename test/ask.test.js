@@ -45,13 +45,35 @@ function startMock() {
                     res.writeHead(code, { 'content-type': 'application/json' });
                     res.end(JSON.stringify(payload));
                 };
+                const base = {
+                    id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-sonnet-5',
+                    usage: { input_tokens: 12, output_tokens: 8, cache_read_input_tokens: 90000, cache_creation_input_tokens: 0 }
+                };
                 if (mockMode === 'ok') {
                     return send(200, {
-                        id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-sonnet-4-6',
-                        content: [{ type: 'text', text: 'Check the impeller.' }],
-                        stop_reason: 'end_turn',
-                        usage: { input_tokens: 12, output_tokens: 8, cache_read_input_tokens: 90000, cache_creation_input_tokens: 0 }
+                        ...base,
+                        // Sonnet 5 returns thinking blocks alongside text; the
+                        // handler must pick out only the text.
+                        content: [
+                            { type: 'thinking', thinking: '' },
+                            { type: 'text', text: 'Check the impeller.' }
+                        ],
+                        stop_reason: 'end_turn'
                     });
+                }
+                if (mockMode === 'truncated') {
+                    return send(200, {
+                        ...base,
+                        content: [{ type: 'text', text: 'Check the impel' }],
+                        stop_reason: 'max_tokens'
+                    });
+                }
+                if (mockMode === 'thinking-only') {
+                    // The whole budget went to thinking — no answer text at all.
+                    return send(200, { ...base, content: [{ type: 'thinking', thinking: '' }], stop_reason: 'max_tokens' });
+                }
+                if (mockMode === 'refusal') {
+                    return send(200, { ...base, content: [], stop_reason: 'refusal' });
                 }
                 const errType = { 429: 'rate_limit_error', 401: 'authentication_error', 500: 'api_error' }[mockMode];
                 send(Number(mockMode), { type: 'error', error: { type: errType, message: 'mock' } });
@@ -118,13 +140,27 @@ describe('the request sent to the Anthropic API', () => {
         mockMode = 'ok';
         const res = await ask({ question: 'Why is it overheating?', context: { tree: 'engine_overheat', node: 'oh_start' } });
         assert.equal(res.status, 200);
-        assert.equal((await res.json()).answer, 'Check the impeller.');
+        assert.equal((await res.json()).answer, 'Check the impeller.',
+            'thinking blocks must be filtered out of the answer');
 
         assert.equal(captured.url, '/v1/messages');
-        assert.equal(captured.body.model, 'claude-sonnet-4-6');
-        assert.equal(captured.body.max_tokens, 1024);
+        assert.equal(captured.body.model, 'claude-sonnet-5');
         assert.equal(captured.body.system.length, 2, 'expected instructions + knowledge-base blocks');
         assert.ok(captured.headers['x-api-key'], 'no auth header sent');
+    });
+
+    // Sonnet 5 turns adaptive thinking on by default and bills it against
+    // max_tokens. Both halves of this matter: without headroom the answer
+    // truncates, and without an explicit effort the default is `high` — the
+    // wrong latency trade for a tech waiting on a phone.
+    test('pins effort to low and leaves max_tokens headroom for thinking', async () => {
+        mockMode = 'ok';
+        await ask({ question: 'test' });
+        assert.deepEqual(captured.body.thinking, { type: 'adaptive' });
+        assert.deepEqual(captured.body.output_config, { effort: 'low' },
+            'effort defaults to `high` on Sonnet 5 — it must be pinned explicitly');
+        assert.ok(captured.body.max_tokens >= 4096,
+            `max_tokens ${captured.body.max_tokens} leaves no room for thinking + answer`);
     });
 
     test('keeps the 1h prompt-cache breakpoint on the knowledge base', async () => {
@@ -148,6 +184,33 @@ describe('the request sent to the Anthropic API', () => {
         for (const run of runs) {
             assert.ok(run.length <= 120, `context field reached ${run.length} chars — the 120-char clamp is gone`);
         }
+    });
+});
+
+describe('degenerate responses never reach the tech as a blank panel', () => {
+    test('a refusal (no content blocks) is reported, not returned as success', async () => {
+        mockMode = 'refusal';
+        const res = await ask({ question: 'test' });
+        assert.equal(res.status, 502, 'an empty answer must not be a 200 success');
+        const body = await res.json();
+        assert.equal(body.success, false);
+        assert.match(body.message, /rephrase|try again/i);
+    });
+
+    test('a turn that spent its whole budget thinking is reported as a length problem', async () => {
+        mockMode = 'thinking-only';
+        const res = await ask({ question: 'test' });
+        assert.equal(res.status, 502);
+        assert.match((await res.json()).message, /length limit|narrower/i);
+    });
+
+    test('a truncated but non-empty answer is still delivered, and flagged', async () => {
+        mockMode = 'truncated';
+        const res = await ask({ question: 'test' });
+        assert.equal(res.status, 200, 'a partial answer is better than none — deliver it');
+        const body = await res.json();
+        assert.equal(body.answer, 'Check the impel');
+        assert.equal(body.truncated, true, 'truncation must be visible to the caller');
     });
 });
 

@@ -740,8 +740,18 @@ app.post('/api/ask', askLimiter, async (req, res) => {
 
     try {
         const msg = await anthropicClient.messages.create({
-            model: 'claude-sonnet-4-6',
-            max_tokens: 1024,
+            model: 'claude-sonnet-5',
+            // Sonnet 5 caps thinking AND answer text against max_tokens together.
+            // On Sonnet 4.6 omitting `thinking` meant no thinking, so 1024 was
+            // all answer; here it would truncate a tech mid-sentence. 4096 leaves
+            // room for low-effort thinking plus the same short bulleted answer.
+            max_tokens: 4096,
+            // Thinking is ON by default on Sonnet 5 (it was off by omission on
+            // 4.6). Keep it — it measurably helps diagnosis — but pin effort to
+            // `low`: the default is `high`, which is the wrong trade for a tech
+            // waiting on a phone next to a running engine.
+            thinking: { type: 'adaptive' },
+            output_config: { effort: 'low' },
             system: [
                 { type: 'text', text: SYSTEM_INSTRUCTIONS },
                 {
@@ -757,8 +767,47 @@ app.post('/api/ask', askLimiter, async (req, res) => {
                 { role: 'user', content: `${ctxLine}\n\nQUESTION: ${question}` }
             ]
         });
+        // Only text blocks — thinking blocks are deliberately not surfaced to
+        // techs (and on Sonnet 5 they carry no text by default anyway).
         const answer = msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
         const usage = msg.usage || {};
+        const truncated = msg.stop_reason === 'max_tokens';
+
+        // An empty answer is a real outcome, not an impossible one: a safety
+        // refusal, or a turn that spent the whole budget thinking. Returning
+        // success with a blank string would show a tech an empty panel.
+        if (!answer) {
+            datastore.logAi({
+                ...meta,
+                question,
+                ctx_tree: ctx.tree || null,
+                ctx_node: ctx.node || null,
+                duration_ms: Date.now() - started,
+                ok: false,
+                error: `empty answer (stop_reason=${msg.stop_reason || 'unknown'})`
+            });
+            datastore.logEvent('ai_error', {
+                ...meta,
+                data: { reason: 'empty_answer', stop_reason: msg.stop_reason || null }
+            });
+            return res.status(502).json({
+                success: false,
+                message: truncated
+                    ? 'The answer ran past its length limit. Try a narrower question.'
+                    : 'No answer came back. Rephrase the question and try again.'
+            });
+        }
+
+        // Truncation is newly possible now that thinking shares max_tokens —
+        // log it so it shows up in the admin panel instead of silently
+        // handing a tech half an answer.
+        if (truncated) {
+            datastore.logEvent('ai_truncated', {
+                ...meta,
+                data: { tokens_out: usage.output_tokens || 0 }
+            });
+        }
+
         datastore.logAi({
             ...meta,
             question, answer,
@@ -769,7 +818,7 @@ app.post('/api/ask', askLimiter, async (req, res) => {
             duration_ms: Date.now() - started,
             ok: true
         });
-        res.json({ success: true, answer });
+        res.json({ success: true, answer, truncated: truncated || undefined });
     } catch (err) {
         console.error('Ask error:', err.message);
         datastore.logAi({
