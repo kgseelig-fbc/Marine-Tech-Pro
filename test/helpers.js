@@ -18,7 +18,8 @@ const net = require('node:net');
 const os = require('node:os');
 const path = require('node:path');
 
-const SERVER_JS = path.join(__dirname, '..', 'server.js');
+const ROOT = path.join(__dirname, '..');
+const SERVER_JS = path.join(ROOT, 'server.js');
 const DEFAULT_ADMIN_CODE = 'test-break-glass-code';
 const DEFAULT_SESSION_SECRET = 'test-secret-not-for-production';
 
@@ -49,10 +50,21 @@ function sleep(ms) {
     return new Promise((r) => setTimeout(r, ms));
 }
 
+// The npm that is running this suite when it was started with `npm test`
+// (npm_execpath points at npm-cli.js), else whatever `npm` is on PATH — CI
+// runs `node --test` directly.
+function npmCommand() {
+    const cli = process.env.npm_execpath;
+    if (cli && /npm-cli\.js$/.test(cli)) return [process.execPath, [cli, 'start', '--silent']];
+    return ['npm', ['start', '--silent']];
+}
+
 // Spawns server.js and resolves once it answers /api/health with this spawn's
 // build marker. `env` overrides the defaults below; pass DATA_DIR to reuse a
 // directory across restarts (secret persistence, break-glass revocation).
 // Set a key to '' to run the server with that variable effectively unset.
+// `viaNpm: true` runs the real `npm start` script from the repo root instead
+// of server.js directly — the process Railway actually signals.
 async function startServer(opts = {}) {
     // The free-port pick is a probe-then-listen race between suites running
     // in parallel; a collision shows up as the child dying on EADDRINUSE.
@@ -65,7 +77,7 @@ async function startServer(opts = {}) {
     }
 }
 
-async function spawnServer({ env = {}, adminCode = DEFAULT_ADMIN_CODE } = {}) {
+async function spawnServer({ env = {}, adminCode = DEFAULT_ADMIN_CODE, viaNpm = false } = {}) {
     const port = await freePort();
     const base = `http://127.0.0.1:${port}`;
     const dataDir = env.DATA_DIR || fs.mkdtempSync(path.join(os.tmpdir(), 'mtp-test-'));
@@ -82,7 +94,13 @@ async function spawnServer({ env = {}, adminCode = DEFAULT_ADMIN_CODE } = {}) {
         GIT_SHA: marker
     }, env);
 
-    const child = spawn(process.execPath, [SERVER_JS], { env: childEnv, stdio: ['ignore', 'pipe', 'pipe'] });
+    const stdio = ['ignore', 'pipe', 'pipe'];
+    // Under npm the server is a grandchild (or great-grandchild, which is the
+    // bug the lifecycle suite guards against); `detached` gives npm its own
+    // process group so rm() can reap whatever a failed run leaves behind.
+    const child = viaNpm
+        ? spawn(...npmCommand(), { cwd: ROOT, env: childEnv, stdio, detached: true })
+        : spawn(process.execPath, [SERVER_JS], { env: childEnv, stdio });
     let out = '';
     child.stdout.on('data', (c) => { out += c; });
     child.stderr.on('data', (c) => { out += c; });
@@ -136,7 +154,10 @@ async function spawnServer({ env = {}, adminCode = DEFAULT_ADMIN_CODE } = {}) {
             child.kill('SIGTERM');
             return exitPromise.then((r) => { clearTimeout(killer); return r; });
         },
-        rm: () => fs.rmSync(dataDir, { recursive: true, force: true })
+        rm: () => {
+            if (viaNpm) { try { process.kill(-child.pid, 'SIGKILL'); } catch (_) { /* already gone */ } }
+            fs.rmSync(dataDir, { recursive: true, force: true });
+        }
     };
 }
 

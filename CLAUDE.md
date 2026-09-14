@@ -9,7 +9,7 @@ Marine Tech Pro is a field diagnostic and repair assistant web app for marine te
 ## Commands
 
 - **Install dependencies:** `npm install`
-- **Run the server:** `npm start` (runs `node server.js` on port 3000)
+- **Run the server:** `npm start` (runs `exec node server.js` on port 3000 — keep the `exec`: npm runs scripts via `sh -c`, and dash does not exec its last command, so without it the tree is `npm → sh → node`, Railway's SIGTERM stops the shell and the server never drains; `test/server-lifecycle.test.js` runs the real start script to guard it)
 - **Run tests:** `npm test` (validates domain data, then runs the suites in `test/` via `node --test`). No API key or network needed — `test/ask.test.js` points the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL` and asserts the exact request the SDK sends, so an SDK upgrade can't silently change the AI contract (notably the 1h prompt-cache breakpoint — losing it re-pays a ~100K-token cache write on every question, with no error to notice). The server-spawning suites share `test/helpers.js` (free port per server, temp `DATA_DIR`, captured stderr on failure), so they can run in parallel; `test/db.test.js` exercises `lib/db.js` directly and `test/server-lifecycle.test.js` covers graceful shutdown.
 - **Validate data only:** `npm run validate` (checks diagnostic-tree graph integrity and node shapes, fault-code schema, engine-spec schema, metric/imperial unit pairs across the data files and the Yamaha corpus, and menu coverage)
 - **Syntax + data check:** `npm run check` (`node --check` on every shipped JS file — server, `lib/`, `scripts/`, `public/js/`, the service worker — then the validator; CI runs this rather than a hand-maintained file list)
@@ -65,7 +65,7 @@ Other server behaviours worth knowing:
 - **Break-glass sessions carry a tag** derived from `ADMIN_CODE`; `loadUser` re-checks it every request, so rotating the code revokes all existing break-glass sessions immediately. The code itself is compared with `crypto.timingSafeEqual`.
 - **Google OAuth uses a `state` parameter** stored in the session and verified in the callback (login-CSRF protection).
 - **Telemetry retention:** `events`/`ai_messages` older than `RETENTION_DAYS` are pruned 30 s after startup (so the health check is never queued behind the first prune) and then daily.
-- **Graceful shutdown** on SIGTERM/SIGINT drains connections and closes SQLite (Railway sends SIGTERM on redeploy).
+- **Graceful shutdown** on SIGTERM/SIGINT drains connections and closes SQLite (Railway sends SIGTERM on redeploy). The signal only arrives because the start script is `exec node server.js` (see Commands); a superseded deployment whose log ends in `npm error signal SIGTERM … command failed` instead of `Shutdown complete.` means a shell is back between npm and node.
 - If a KB file fails to load the server still starts; only `/api/ask` degrades to 503. A missing `kb/yamahaManuals.js` is warned about at startup (the AI silently stops citing factory specs otherwise). The KB system text is built once at startup (`KB_SYSTEM_TEXT`) and the corpus file's `window.yamahaManualReference = \`…\`;` wrapper is stripped so it is not billed as prompt tokens.
 - **`ai_messages` records `user_id`, `cache_read` and `cache_write`** (prompt-cache read/write tokens) separately from `tokens_in`, and the admin overview reports a 24h cache hit rate — summed together, a silently lost 1h cache breakpoint looked identical to a healthy one.
 

@@ -6,7 +6,8 @@
 // (a ref'd timer plus a removed process.exit) would sit there until the
 // platform's SIGKILL. The other suites tear their servers down with SIGTERM
 // too and assert exit 0, so this file only covers what they cannot: what an
-// in-flight request sees while the drain is running.
+// in-flight request sees while the drain is running, and whether the signal
+// reaches server.js at all when the process Railway signals is `npm start`.
 
 const { test, describe } = require('node:test');
 const assert = require('node:assert');
@@ -105,6 +106,34 @@ describe('graceful shutdown', () => {
             assert.ok(!/Shutdown complete/.test(app.output()), 'server.close() never completed, so this must be the timeout path');
         } finally {
             req.close();
+            app.rm();
+        }
+    });
+});
+
+describe('npm start', () => {
+    test('SIGTERM sent to `npm start` reaches server.js, and npm exits 0 once the drain completes', async () => {
+        // Railway runs the service as `npm start`, signals that process and
+        // reads its exit status. npm runs the script through `sh -c`, and
+        // dash does not exec its last command — so with a start script of
+        // plain `node server.js` the tree was npm → sh → node, SIGTERM stopped
+        // the shell, node never saw it (no drain, no SQLite checkpoint, an
+        // orphan still serving until the SIGKILL) and every redeploy ended in
+        // "npm error signal SIGTERM … command failed". `exec` in the start
+        // script removes the shell. This is the only test that runs the real
+        // start script rather than server.js directly, so it is the only one
+        // that would notice the `exec` going missing.
+        const app = await H.startServer({ viaNpm: true });
+        try {
+            const { code, signal } = await app.stop();
+            assert.equal(code, 0, `npm must exit with the server's own status:\n${app.output()}`);
+            assert.equal(signal, null);
+            assert.match(app.output(), /SIGTERM received — draining connections/,
+                'the signal must reach server.js, not stop at a wrapper shell');
+            assert.match(app.output(), /Shutdown complete\./);
+            await assert.rejects(fetch(app.base + '/api/health'),
+                'the server must be gone when npm exits — an orphaned node keeps serving until the platform SIGKILLs it');
+        } finally {
             app.rm();
         }
     });
