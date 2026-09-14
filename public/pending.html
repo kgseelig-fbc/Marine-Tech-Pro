@@ -101,26 +101,35 @@ function signOut() {
         .finally(function(){ window.location.replace('/login'); });
 }
 
-function checkStatus() {
-    $('statusMsg').textContent = '';
+// The silent flag is set by the background poll: it only redirects once the role
+// changes and never touches the message area, so the page doesn't blink
+// "Still pending" every 20 s or wipe an error from a manual press.
+var clearMsgTimer = null;
+function checkStatus(silent) {
+    if (!silent) {
+        clearTimeout(clearMsgTimer);
+        $('statusMsg').textContent = '';
+    }
     fetch('/api/me')
         .then(function(r){ return r.json(); })
         .then(function(m){
             if (!m.authenticated) { window.location.replace('/login'); return; }
             var role = m.user && m.user.role;
             if (role === 'pending') {
-                $('statusMsg').style.color = 'var(--muted)';
-                $('statusMsg').textContent = 'Still pending — an admin hasn’t approved this account yet.';
-                setTimeout(function(){ $('statusMsg').textContent = ''; }, 4000);
+                if (!silent) {
+                    $('statusMsg').style.color = 'var(--muted)';
+                    $('statusMsg').textContent = 'Still pending — an admin hasn’t approved this account yet.';
+                    clearMsgTimer = setTimeout(function(){ $('statusMsg').textContent = ''; }, 4000);
+                }
             } else if (role === 'denied') {
                 window.location.replace('/login?error=denied');
-            } else if (role === 'admin') {
-                window.location.replace('/admin');
             } else {
+                // Admins land on the tech app too (same as the server's landingFor()).
                 window.location.replace('/');
             }
         })
         .catch(function(){
+            if (silent) return;
             $('statusMsg').style.color = 'var(--danger)';
             $('statusMsg').textContent = 'Network error — try again.';
         });
@@ -133,7 +142,7 @@ fetch('/api/me').then(function(r){ return r.json(); }).then(function(m){
     var via = u.provider === 'google' ? ' · via Google' : u.provider === 'local' ? ' · email/password' : '';
     $('who').textContent = (u.email || '') + via;
     // Auto-refresh every 20s — if admin approved, they get bounced in immediately.
-    setInterval(checkStatus, 20000);
+    setInterval(function(){ checkStatus(true); }, 20000);
 }).catch(function(){});
 </script>
 </body>

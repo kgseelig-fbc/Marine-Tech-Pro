@@ -51,23 +51,45 @@
             font-size: 13px; color: var(--muted);
             text-align: center;
         }
-        .mode-toggle a {
+        /* Link-styled real <button>s: anchors without href are unreachable by
+           keyboard and have no role, so mode-toggle and break-glass had to
+           become buttons. Inherit the surrounding text, keep a 44px tap height. */
+        .linklike {
+            display: inline-flex; align-items: center;
+            min-height: 44px;
+            padding: 0 4px;
+            background: none; border: 0;
+            font: inherit;
             color: var(--fbc-navy-3);
             font-weight: 700;
             cursor: pointer;
+            -webkit-appearance: none; appearance: none;
         }
-        .mode-toggle a:hover { text-decoration: underline; }
+        .linklike:hover, .linklike:focus-visible { text-decoration: underline; }
 
         .breakglass-link {
             margin-top: 14px;
             font-size: 11.5px; color: var(--muted-2);
             text-align: center;
         }
-        .breakglass-link a {
+        .breakglass-link .linklike {
             color: var(--muted);
-            cursor: pointer;
+            font-weight: 600;
         }
-        .breakglass-link a:hover { color: var(--fbc-navy-3); text-decoration: underline; }
+        .breakglass-link .linklike:hover, .breakglass-link .linklike:focus-visible { color: var(--fbc-navy-3); }
+
+        /* Terms/Privacy line — the login page is the site root for anyone
+           signed out, so the policies must be reachable from here. (X12) */
+        .legal-line {
+            font-size: 11.5px; color: var(--muted-2);
+            margin-top: 8px; line-height: 1.6;
+        }
+        .legal-line a {
+            color: var(--muted);
+            text-decoration: underline;
+            display: inline-block; padding: 4px 2px;
+        }
+        .legal-line a:hover { color: var(--fbc-navy-3); }
 
         .help-text {
             font-size: 12px;
@@ -115,11 +137,11 @@
 
             <button class="btn-primary" id="submitBtn" type="button" onclick="submitForm()">Sign in</button>
 
-            <div class="error-msg" id="errorMsg"></div>
+            <div class="error-msg" id="errorMsg" role="alert"></div>
 
             <div class="mode-toggle">
                 <span id="toggleText">New here?</span>
-                <a id="toggleLink" onclick="toggleMode()">Create an account</a>
+                <button type="button" class="linklike" id="toggleLink" onclick="toggleMode()">Create an account</button>
             </div>
         </div>
 
@@ -129,9 +151,9 @@
                 <input type="password" id="adminCodeInput" placeholder="Admin access code" autocomplete="off">
             </div>
             <button class="btn-primary" type="button" onclick="submitAdminCode()">Sign in as admin</button>
-            <div class="error-msg" id="breakErr"></div>
+            <div class="error-msg" id="breakErr" role="alert"></div>
             <div class="mode-toggle">
-                <a onclick="showMainForm()">Back to sign in</a>
+                <button type="button" class="linklike" onclick="showMainForm()">Back to sign in</button>
             </div>
         </div>
 
@@ -140,6 +162,9 @@
         <div class="fine">
             <svg class="icon icon-sm"><use href="/icons/sprite.svg#i-lock"/></svg>
             Secure session · Freedom Boat Club
+        </div>
+        <div class="legal-line">
+            By signing in you agree to the <a href="/terms">Terms of Service</a> and <a href="/privacy">Privacy Policy</a>.
         </div>
     </div>
 </div>
@@ -150,7 +175,9 @@ var mode = 'signin'; // 'signin' | 'signup'
 function $(id) { return document.getElementById(id); }
 function showErr(id, text) {
     var el = $(id); el.textContent = text;
-    setTimeout(function(){ if (el.textContent === text) el.textContent = ''; }, 5000);
+    // Long enough to read on a phone in sunlight; still clears so a stale
+    // error doesn't sit under the next attempt.
+    setTimeout(function(){ if (el.textContent === text) el.textContent = ''; }, 8000);
 }
 function shake(inputId) {
     var el = $(inputId);
@@ -249,7 +276,7 @@ function submitAdminCode() {
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (d.success) {
-            window.location.replace(d.redirect || '/admin');
+            window.location.replace(d.redirect || '/');
         } else {
             showErr('breakErr', d.message || 'Invalid code.');
             shake('adminCodeInput');
@@ -279,7 +306,8 @@ $('adminCodeInput').addEventListener('keydown', function(e){ if (e.key === 'Ente
             denied: 'Your account access has been revoked.',
             oauth: 'Google sign-in was cancelled or failed.',
             session: 'Session error. Please try again.',
-            google_disabled: 'Google sign-in is not configured yet.'
+            google_disabled: 'Google sign-in is not configured yet.',
+            email_exists: 'An account with that email already exists. Sign in with your email and password, or ask an admin.'
         })[err] || 'Something went wrong — please try again.';
         showErr('errorMsg', msg);
     }
@@ -294,7 +322,7 @@ fetch('/api/auth/config')
             $('dividerEl').classList.remove('hidden');
         }
         if (cfg.adminCodeEnabled) {
-            $('breakglassLink').innerHTML = '<a onclick="showBreakForm()">Admin break-glass access</a>';
+            $('breakglassLink').innerHTML = '<button type="button" class="linklike" onclick="showBreakForm()">Admin break-glass access</button>';
         }
     })
     .catch(function(){});
@@ -305,7 +333,8 @@ fetch('/api/me')
     .then(function(m){
         if (m.authenticated) {
             var role = m.user && m.user.role;
-            var to = role === 'pending' ? '/pending' : role === 'admin' ? '/admin' : '/';
+            // Matches the server's landingFor(): admins use the tech app too.
+            var to = role === 'pending' ? '/pending' : '/';
             window.location.replace(to);
         } else {
             $('emailInput').focus();

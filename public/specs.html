@@ -20,6 +20,36 @@
             margin-right: 8px;
             vertical-align: middle;
         }
+
+        /* Picker buttons carry the model-year span on a second line so a
+           fleet tech can't confuse a 2003–2013 platform with its current
+           sibling (compression, thermostat and plug specs differ). */
+        .engine-pick-btn {
+            display: inline-flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 2px;
+            text-align: left;
+        }
+        .engine-pick-years {
+            font-size: 11.5px;
+            font-weight: 600;
+            opacity: .85;
+        }
+        .engine-pick-divider {
+            flex-basis: 100%;
+            width: 100%;
+            margin: 10px 0 2px;
+            font-size: 12px;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: .06em;
+            color: var(--muted);
+        }
+        .spec-engine-name:focus { outline: none; }
+
+        /* Clear the Ask/Feedback FABs so the last maintenance row is tappable. */
+        #specDisplay { padding-bottom: 120px; }
     </style>
 </head>
 <body>
@@ -57,12 +87,22 @@
             return;
         }
 
+        // Current platforms first; legacy (pre-2014) ones after a divider so
+        // the obsolete entry is never the first "F115" a tech sees. Entries
+        // without yearsShort/legacy (older data) render as current, one line.
         var html = '';
+        var legacyHtml = '';
         for (var i = 0; i < window.engineSpecDatabase.length; i++) {
             var eng = window.engineSpecDatabase[i];
-            html = html + '<button class="engine-pick-btn" id="engBtn_' + i + '" onclick="showEngine(' + i + ')">';
-            html = html + eng.name;
-            html = html + '</button>';
+            var btn = '<button type="button" class="engine-pick-btn" id="engBtn_' + i + '" aria-pressed="false" onclick="showEngine(' + i + ')">';
+            btn = btn + '<span class="engine-pick-name">' + eng.name + '</span>';
+            if (eng.yearsShort) btn = btn + '<span class="engine-pick-years">' + eng.yearsShort + '</span>';
+            btn = btn + '</button>';
+            if (eng.legacy) legacyHtml = legacyHtml + btn;
+            else html = html + btn;
+        }
+        if (legacyHtml) {
+            html = html + '<h3 class="engine-pick-divider">Legacy platforms (pre-2014)</h3>' + legacyHtml;
         }
         container.innerHTML = html;
     };
@@ -78,11 +118,14 @@
         var allBtns = document.querySelectorAll('.engine-pick-btn');
         for (var b = 0; b < allBtns.length; b++) {
             allBtns[b].className = 'engine-pick-btn';
+            allBtns[b].setAttribute('aria-pressed', 'false');
         }
-        document.getElementById('engBtn_' + index).className = 'engine-pick-btn active';
+        var activeBtn = document.getElementById('engBtn_' + index);
+        activeBtn.className = 'engine-pick-btn active';
+        activeBtn.setAttribute('aria-pressed', 'true');
 
         var html = '<div class="spec-card">';
-        html = html + '<div class="spec-engine-name">' + eng.name + '</div>';
+        html = html + '<div class="spec-engine-name" role="heading" aria-level="2" tabindex="-1">' + eng.name + '</div>';
         html = html + '<div class="spec-years">' + eng.years + '</div>';
 
         html = html + '<table class="spec-table">';
@@ -172,6 +215,10 @@
 
         html = html + '</div>';
         document.getElementById('specDisplay').innerHTML = html;
+        // Focus the engine name so screen readers announce which spec sheet
+        // just rendered; preventScroll so the smooth scroll below still runs.
+        var heading = document.querySelector('#specDisplay .spec-engine-name');
+        if (heading) { try { heading.focus({ preventScroll: true }); } catch (_) { heading.focus(); } }
         document.getElementById('specDisplay').scrollIntoView({ behavior: 'smooth' });
     }
 
