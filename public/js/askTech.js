@@ -1,5 +1,6 @@
 // js/askTech.js
-// Floating "Ask a Tech" widget. Included on every authenticated page.
+// Floating "Ask a Tech" widget. Loaded by the four app pages (index, diagnose,
+// fault-codes, specs) after js/common.js — not by /admin or /pending.
 // - Text Q&A to /api/ask, grounded by server-side knowledge base
 // - Voice input: Web Speech API (Chrome/Android + iOS 14.5+ Safari via webkit prefix)
 // - Voice output: SpeechSynthesis with best-available native voice selection

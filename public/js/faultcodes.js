@@ -1,4 +1,4 @@
-// js/faultCodes.js
+// js/faultcodes.js
 //
 // Fault code database for Mercury SmartCraft and Yamaha outboards.
 //
