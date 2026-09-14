@@ -10,10 +10,13 @@
     var SP = '/icons/sprite.svg';
     var VOICE_PREF_KEY = 'mtp-voice-pref-v1';
     var RATE_PREF_KEY = 'mtp-voice-rate-v1';
-    // The server gives the SDK 60 s and one retry, so nothing useful arrives
-    // after ~2 min; a mobile browser can leave a dropped request pending far
-    // longer, with Send disabled the whole time.
-    var ASK_TIMEOUT_MS = 75 * 1000;
+    // Must cover the server's worst case: the SDK gets 60 s per attempt and
+    // one retry (server.js), so a first attempt that times out and a retry
+    // that succeeds can legitimately finish at ~125 s. Giving up earlier
+    // discards an answer the server then bills and logs as delivered. A
+    // mobile browser can otherwise leave a dropped request pending far
+    // longer than this, with Send disabled the whole time.
+    var ASK_TIMEOUT_MS = 130 * 1000;
 
     // Storage access THROWS (rather than returning null) when site data is
     // blocked for the origin — private mode on some browsers, managed-device

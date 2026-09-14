@@ -242,7 +242,12 @@ self.addEventListener('fetch', function (event) {
         event.waitUntil(net.catch(function () {}));
 
         event.respondWith(
-            matchCurrent(req).then(function (cached) {
+            matchCurrent(req).then(function (current) {
+                // A retained older generation counts as a cached copy here:
+                // it is exactly what the tech gets once the network fails, so
+                // it is also what they should get instead of a 30 s stall.
+                return cachedCopy(req, current);
+            }).then(function (cached) {
                 // With a cached copy on hand, stop waiting on a stalled
                 // connection after HTML_NETWORK_TIMEOUT_MS. Without one there
                 // is nothing better to show, so wait the network out.

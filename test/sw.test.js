@@ -347,6 +347,18 @@ describe('service worker fetch fallbacks', () => {
             'a stalled marina connection left the tech on a blank tab with the page in cache');
     });
 
+    test('HTML: a page held only by a retained older generation also gets the timeout', async () => {
+        // The older copy is what the tech gets once the network fails, so it
+        // is also what they should get instead of a 30 s stall.
+        const caches = makeCaches({ [OLD_GEN]: { '/fault-codes.html': 'OLDER PAGE' } });
+        const { listeners, sandbox } = loadWith(caches, () => new Promise(() => {}));
+        vm.runInContext('HTML_NETWORK_TIMEOUT_MS = 20', sandbox);
+
+        const { out } = dispatchFetch(listeners, navigate(sandbox, '/fault-codes.html'));
+        assert.equal(await out, 'OLDER PAGE',
+            'a stalled network must fall back to the retained generation, not hang');
+    });
+
     test('HTML: without a cached copy the navigation keeps waiting on the network (no timeout)', async () => {
         const { listeners, sandbox } = loadWith(makeCaches({}), () => new Promise(() => {}));
         vm.runInContext('HTML_NETWORK_TIMEOUT_MS = 20', sandbox);
