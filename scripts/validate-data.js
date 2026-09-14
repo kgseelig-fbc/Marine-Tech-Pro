@@ -67,11 +67,11 @@ function loadDataFiles() {
 // ---------------------------------------------------------------------------
 const NUM = '(\\d+(?:\\.\\d+)?)';
 const UNIT_PAIRS = [
-    { name: 'kPa/PSI', re: new RegExp(NUM + '\\s*kPa\\s*\\([^)]*?~?' + NUM + '\\s*PSI\\)', 'g'),
+    { name: 'kPa/PSI', re: new RegExp(NUM + '\\s*kPa\\s*\\([^)]*?~?' + NUM + '\\s*psi\\)', 'gi'),
       conv: kPa => kPa * 0.1450377, absTol: 1.5, unit: 'PSI' },
     { name: 'Nm/ft-lb', re: new RegExp(NUM + '\\s*Nm\\s*\\([^)]*?~?' + NUM + '\\s*ft-lb\\)', 'g'),
       conv: nm => nm * 0.7375621, relTol: 0.03, absFloor: 1, unit: 'ft-lb' },
-    { name: 'cc/US oz', re: new RegExp(NUM + '\\s*cc\\s*/\\s*~?' + NUM + '\\s*US oz', 'g'),
+    { name: 'cc/US oz', re: new RegExp(NUM + '\\s*(?:cc|cm³)\\s*(?:/|\\([^)]*?)\\s*~?' + NUM + '\\s*US oz', 'g'),
       conv: cc => cc / 29.5735, relTol: 0.02, unit: 'US oz' },
     { name: 'L/US oz', re: new RegExp(NUM + '\\s*L\\s*/\\s*~?' + NUM + '\\s*US oz', 'g'),
       conv: l => l * 1000 / 29.5735, relTol: 0.02, unit: 'US oz' },

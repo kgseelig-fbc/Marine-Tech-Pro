@@ -621,8 +621,22 @@ describe('signup flood limit', () => {
         assert.equal(code, 0, `server should exit 0 on SIGTERM:\n${s.output()}`);
     });
 
+    test('failed sign-ups do not consume the budget (typos must not lock a marina out)', async () => {
+        // Three failures first: a short password (400) and, after a real
+        // signup below succeeds, a duplicate (409) — none of these may count.
+        for (let i = 0; i < 2; i++) {
+            const { res } = await H.signup(s.base, `typo${i}@example.com`, 'short');
+            assert.equal(res.status, 400);
+        }
+        const first = await H.signup(s.base, 'flood1@example.com', 'flood-password-123');
+        assert.equal(first.res.status, 200, 'a valid signup after failed attempts must still succeed');
+        const dup = await H.signup(s.base, 'flood1@example.com', 'flood-password-123');
+        assert.equal(dup.res.status, 409);
+    });
+
     test('successful sign-ups count against the limit: the 4th from one IP is 429', async () => {
-        for (let i = 1; i <= 3; i++) {
+        // flood1 was created by the test above and counts as the first success.
+        for (let i = 2; i <= 3; i++) {
             const { res } = await H.signup(s.base, `flood${i}@example.com`, 'flood-password-123');
             assert.equal(res.status, 200, `signup ${i} should succeed`);
         }

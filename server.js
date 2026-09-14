@@ -132,6 +132,9 @@ const SIGNUP_RATE_PER_HOUR = Number(process.env.SIGNUP_RATE_PER_HOUR) || 10;
 const signupLimiter = rateLimit({
     windowMs: 60 * 60 * 1000,
     max: SIGNUP_RATE_PER_HOUR,
+    // Failures (bad email, short password, duplicate) don't count: they cost
+    // nothing and a few typos must not lock a whole marina out of signing up.
+    skipFailedRequests: true,
     standardHeaders: true,
     legacyHeaders: false,
     message: { success: false, message: 'Too many sign-ups from this network. Try again later.' }
@@ -743,6 +746,8 @@ app.get('/', (req, res) => {
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 // Explicit budget: without these, the SDK defaults to a 10-minute timeout with
 // 2 retries — a degraded upstream could hold a tech's phone connection ~30 min.
+// The widget's ASK_TIMEOUT_MS (public/js/askTech.js) must cover the worst case
+// of this pair (60 s + retry backoff + 60 s); change them together.
 const anthropicClient = ANTHROPIC_API_KEY
     ? new Anthropic({ apiKey: ANTHROPIC_API_KEY, timeout: 60 * 1000, maxRetries: 1 })
     : null;
@@ -848,6 +853,27 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
         ? `CURRENT CONTEXT: Tech is in diagnostic tree "${ctx.tree}" at node "${ctx.node || 'unknown'}".`
         : `CURRENT CONTEXT: Tech is browsing the app (no active diagnostic).`;
 
+    // If the tech's browser gives up (its own timeout, a closed tab, lost
+    // signal), stop the upstream call too — including the SDK's retry —
+    // instead of paying for an answer nobody will see. writableFinished is
+    // false on 'close' only when the connection went away before we answered.
+    const upstream = new AbortController();
+    res.on('close', () => { if (!res.writableFinished) upstream.abort(); });
+
+    // One place for the usage fields both logAi calls record, so the empty-
+    // answer path (the most expensive failure: a full prompt with nothing
+    // usable back) shows its real token cost in the admin table too.
+    const usageFields = (usage) => ({
+        tokens_in: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
+        tokens_out: usage.output_tokens || 0,
+        // Kept apart from tokens_in so the admin panel can see whether the
+        // 1h cache breakpoint is landing: a request that READ 100K cached
+        // tokens and one that WROTE them cost very differently but sum
+        // to the same tokens_in.
+        cache_read: usage.cache_read_input_tokens || 0,
+        cache_write: usage.cache_creation_input_tokens || 0
+    });
+
     try {
         const msg = await anthropicClient.messages.create({
             model: 'claude-sonnet-5',
@@ -876,7 +902,7 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
             messages: [
                 { role: 'user', content: `${ctxLine}\n\nQUESTION: ${question}` }
             ]
-        });
+        }, { signal: upstream.signal });
         // Only text blocks — thinking blocks are deliberately not surfaced to
         // techs (and on Sonnet 5 they carry no text by default anyway).
         const answer = msg.content.filter(b => b.type === 'text').map(b => b.text).join('\n').trim();
@@ -892,8 +918,7 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
                 question,
                 ctx_tree: ctx.tree || null,
                 ctx_node: ctx.node || null,
-                cache_read: usage.cache_read_input_tokens || 0,
-                cache_write: usage.cache_creation_input_tokens || 0,
+                ...usageFields(usage),
                 duration_ms: Date.now() - started,
                 ok: false,
                 error: `empty answer (stop_reason=${msg.stop_reason || 'unknown'})`
@@ -925,14 +950,7 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
             question, answer,
             ctx_tree: ctx.tree || null,
             ctx_node: ctx.node || null,
-            tokens_in: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
-            tokens_out: usage.output_tokens || 0,
-            // Kept apart from tokens_in so the admin panel can see whether the
-            // 1h cache breakpoint is landing: a request that READ 100K cached
-            // tokens and one that WROTE them cost very differently but sum
-            // to the same tokens_in.
-            cache_read: usage.cache_read_input_tokens || 0,
-            cache_write: usage.cache_creation_input_tokens || 0,
+            ...usageFields(usage),
             duration_ms: Date.now() - started,
             ok: true
         });
@@ -948,7 +966,10 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
             ok: false,
             error: err.message
         });
-        datastore.logEvent('ai_error', { ...meta, data: { msg: err.message, status: err.status || null } });
+        datastore.logEvent('ai_error', { ...meta, data: { msg: err.message, status: err.status || null, aborted: upstream.signal.aborted || undefined } });
+        // The client is gone: nothing below can be delivered, and writing to
+        // a closed connection is a no-op, so just return.
+        if (upstream.signal.aborted) return;
         // Map upstream status through instead of a blanket 500, so the client
         // backs off on rate limits and surfaces config problems to an admin.
         if (err.status === 429 || err.status === 529) {

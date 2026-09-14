@@ -519,7 +519,10 @@
     // enough to rebuild the view; popstate restores it (or shows the picker).
 
     function diagState() {
-        return { tree: window.__currentDiagTree, node: currentNodeId, hist: navHistory.slice() };
+        // The resolve-dedupe set rides along so a popstate back into a
+        // resolution (New Diagnosis then Back, or a reload) restores it
+        // instead of counting the same resolution twice.
+        return { tree: window.__currentDiagTree, node: currentNodeId, hist: navHistory.slice(), resolved: Object.keys(resolvedThisRun) };
     }
 
     function pushDiagState(state) {
@@ -538,6 +541,8 @@
         currentTree = window.defined_trees[s.tree];
         currentNodeId = s.node || currentTree.startNode;
         navHistory = (s.hist || []).slice();
+        resolvedThisRun = {};
+        (s.resolved || []).forEach(function (k) { resolvedThisRun[k] = true; });
         window.__currentDiagTree = s.tree;
         window.__currentDiagNode = currentNodeId;
         document.getElementById('symptomPicker').style.display = 'none';
@@ -635,6 +640,9 @@
                     severity: node.severity || null,
                     title: node.title || null
                 });
+                // The entry for this node was pushed before the beacon fired;
+                // record the resolution on it so returning here never re-counts.
+                replaceDiagState(diagState());
             }
             renderResolution(node); return;
         }
@@ -771,7 +779,11 @@
         // later popstate to it is recognised.
         var s = null;
         try { s = history.state; } catch (_) {}
-        histDepth = 0;
+        // Keep the restored entry's depth: after a reload mid-tree the
+        // entries beneath are still ours, so goBack() can keep walking the
+        // browser history instead of falling back to an in-memory pop that
+        // leaves the next hardware Back landing on the node already shown.
+        histDepth = (s && typeof s.depth === 'number') ? s.depth : 0;
         if (restoreDiagState(s)) replaceDiagState(diagState());
         else replaceDiagState({ picker: true });
     })();

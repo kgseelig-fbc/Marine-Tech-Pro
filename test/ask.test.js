@@ -162,6 +162,15 @@ describe('degenerate responses never reach the tech as a blank panel', () => {
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 502);
         assert.match((await res.json()).message, /length limit|narrower/i);
+
+        // The most expensive failure (a full prompt, nothing usable back)
+        // must show its real token cost in the admin table, not "0 / 0".
+        const o = await overview();
+        const row = o.recentAi[0];
+        assert.equal(row.ok, 0);
+        assert.equal(row.tokens_out, 8, 'output tokens from usage must be recorded on the empty-answer path');
+        assert.equal(row.tokens_in, 90012, 'input + cache tokens must be recorded on the empty-answer path');
+        assert.equal(row.cache_read, 90000);
     });
 
     test('a truncated but non-empty answer is still delivered, flagged, and visible to admins', async () => {

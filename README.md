@@ -58,7 +58,7 @@ See `.env.example` for a commented template. Nothing is required to boot; these 
 | `INITIAL_ADMIN_EMAILS` | one of the two bootstrap paths | Comma-separated emails auto-approved as admin on Google sign-in (first sign-in, or the next one if they are already pending). Never applies to local signups — their email is unverified. |
 | `ANTHROPIC_API_KEY` | for Ask-a-Tech | Without it `/api/ask` returns 503 and the rest of the app works. |
 | `ASK_RATE_PER_MIN` | no | Ask-a-Tech questions per minute per signed-in user (default 15). |
-| `SIGNUP_RATE_PER_HOUR` | no | Successful local sign-ups per hour per IP (default 10). |
+| `SIGNUP_RATE_PER_HOUR` | no | Successful local sign-ups per hour per IP (default 10); failed attempts do not count. |
 | `RETENTION_DAYS` | no | Days of usage events and AI transcripts to keep (default 90; 0 disables pruning). Feedback is never pruned. |
 | `DRAIN_TIMEOUT_MS` | no | Drain budget after SIGTERM (default 25000). Keep it below the platform's grace window. |
 | `GIT_SHA` | no | Build id shown by `/api/health` and `/admin`. Railway supplies `RAILWAY_GIT_COMMIT_SHA` automatically. |
