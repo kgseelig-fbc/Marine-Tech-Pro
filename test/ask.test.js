@@ -8,141 +8,64 @@
 // a large cost regression with no error and no visible symptom.
 //
 // No API key and no network required: the SDK honours ANTHROPIC_BASE_URL, so
-// the real handler is pointed at a local mock that records what it receives.
+// the real handler is pointed at a local mock (test/helpers.js) that records
+// what it receives.
+//
+// The main server runs with ASK_RATE_PER_MIN raised well above the default
+// 15/min: this file fires more than that in a second, and a limiter 429 in
+// the middle of a contract test reads as "expected 200, got 429" with nothing
+// pointing at the limiter. The limiter itself is tested in its own server at
+// the bottom, where the per-user keying is what matters.
 
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert');
-const { spawn } = require('node:child_process');
-const http = require('node:http');
-const fs = require('node:fs');
-const os = require('node:os');
-const path = require('node:path');
+const H = require('./helpers');
 
-const APP_PORT = 3973;
-const MOCK_PORT = 3974;
-const BASE = `http://127.0.0.1:${APP_PORT}`;
-const ADMIN_CODE = 'test-break-glass-code';
-
-let child;
+let app;
 let mock;
-let dataDir;
 let cookie = '';
 
-// Set by each test before it calls /api/ask.
-let mockMode = 'ok';
-let captured = null;
-let upstreamHits = 0;
-
-function startMock() {
-    return new Promise((resolve) => {
-        mock = http.createServer((req, res) => {
-            let body = '';
-            req.on('data', (c) => (body += c));
-            req.on('end', () => {
-                upstreamHits++;
-                captured = { url: req.url, headers: req.headers, body: JSON.parse(body || '{}') };
-                const send = (code, payload) => {
-                    res.writeHead(code, { 'content-type': 'application/json' });
-                    res.end(JSON.stringify(payload));
-                };
-                const base = {
-                    id: 'msg_test', type: 'message', role: 'assistant', model: 'claude-sonnet-5',
-                    usage: { input_tokens: 12, output_tokens: 8, cache_read_input_tokens: 90000, cache_creation_input_tokens: 0 }
-                };
-                if (mockMode === 'ok') {
-                    return send(200, {
-                        ...base,
-                        // Sonnet 5 returns thinking blocks alongside text; the
-                        // handler must pick out only the text.
-                        content: [
-                            { type: 'thinking', thinking: '' },
-                            { type: 'text', text: 'Check the impeller.' }
-                        ],
-                        stop_reason: 'end_turn'
-                    });
-                }
-                if (mockMode === 'truncated') {
-                    return send(200, {
-                        ...base,
-                        content: [{ type: 'text', text: 'Check the impel' }],
-                        stop_reason: 'max_tokens'
-                    });
-                }
-                if (mockMode === 'thinking-only') {
-                    // The whole budget went to thinking — no answer text at all.
-                    return send(200, { ...base, content: [{ type: 'thinking', thinking: '' }], stop_reason: 'max_tokens' });
-                }
-                if (mockMode === 'refusal') {
-                    return send(200, { ...base, content: [], stop_reason: 'refusal' });
-                }
-                const errType = { 429: 'rate_limit_error', 401: 'authentication_error', 500: 'api_error' }[mockMode];
-                send(Number(mockMode), { type: 'error', error: { type: errType, message: 'mock' } });
-            });
-        });
-        mock.listen(MOCK_PORT, resolve);
-    });
+function ask(body, opts = {}) {
+    return H.postJson(app.base, '/api/ask', body, { cookie, ...opts });
 }
 
-function ask(body, opts = {}) {
-    return fetch(BASE + '/api/ask', {
-        method: 'POST',
-        redirect: 'manual',
-        headers: { 'Content-Type': 'application/json', ...(cookie ? { Cookie: cookie } : {}), ...(opts.headers || {}) },
-        body: JSON.stringify(body)
-    });
+async function overview() {
+    const r = await H.get(app.base, '/api/admin/overview', { cookie });
+    assert.equal(r.status, 200);
+    return r.json();
 }
 
 before(async () => {
-    await startMock();
-    dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'mtp-ask-'));
-    child = spawn(process.execPath, [path.join(__dirname, '..', 'server.js')], {
+    mock = await H.startMockAnthropic();
+    app = await H.startServer({
         env: {
-            ...process.env,
-            PORT: String(APP_PORT),
-            DATA_DIR: dataDir,
-            SESSION_SECRET: 'test-secret-not-for-production',
-            ADMIN_CODE,
             ANTHROPIC_API_KEY: 'sk-ant-test-not-a-real-key',
-            ANTHROPIC_BASE_URL: `http://127.0.0.1:${MOCK_PORT}`
-        },
-        stdio: 'ignore'
+            ANTHROPIC_BASE_URL: mock.base,
+            ASK_RATE_PER_MIN: '1000'
+        }
     });
-
-    const deadline = Date.now() + 15000;
-    for (;;) {
-        try {
-            const r = await fetch(BASE + '/api/health');
-            if (r.ok) break;
-        } catch (_) { /* not up yet */ }
-        if (Date.now() > deadline) throw new Error('server did not start');
-        await new Promise((r) => setTimeout(r, 150));
-    }
-
-    // Break-glass gives an authenticated session without paying bcrypt.
-    const login = await fetch(BASE + '/api/auth/admin-code', {
-        method: 'POST',
-        redirect: 'manual',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: ADMIN_CODE })
-    });
-    cookie = (login.headers.getSetCookie?.() || []).map((c) => c.split(';')[0]).join('; ');
-    assert.ok(cookie, 'failed to obtain a session cookie');
+    // Break-glass gives an authenticated (admin) session without paying bcrypt.
+    cookie = await H.breakGlass(app.base);
 });
 
-after(() => {
-    if (child) child.kill();
-    if (mock) mock.close();
-    if (dataDir) fs.rmSync(dataDir, { recursive: true, force: true });
+after(async () => {
+    if (app) {
+        const { code } = await app.stop();
+        app.rm();
+        assert.equal(code, 0, `server should exit 0 on SIGTERM:\n${app.output()}`);
+    }
+    if (mock) await mock.close();
 });
 
 describe('the request sent to the Anthropic API', () => {
     test('carries the model, token cap and grounded system blocks', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         const res = await ask({ question: 'Why is it overheating?', context: { tree: 'engine_overheat', node: 'oh_start' } });
         assert.equal(res.status, 200);
         assert.equal((await res.json()).answer, 'Check the impeller.',
             'thinking blocks must be filtered out of the answer');
 
+        const captured = mock.captured();
         assert.equal(captured.url, '/v1/messages');
         assert.equal(captured.body.model, 'claude-sonnet-5');
         assert.equal(captured.body.system.length, 2, 'expected instructions + knowledge-base blocks');
@@ -154,19 +77,20 @@ describe('the request sent to the Anthropic API', () => {
     // truncates, and without an explicit effort the default is `high` — the
     // wrong latency trade for a tech waiting on a phone.
     test('pins effort to low and leaves max_tokens headroom for thinking', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         await ask({ question: 'test' });
-        assert.deepEqual(captured.body.thinking, { type: 'adaptive' });
-        assert.deepEqual(captured.body.output_config, { effort: 'low' },
+        const { body } = mock.captured();
+        assert.deepEqual(body.thinking, { type: 'adaptive' });
+        assert.deepEqual(body.output_config, { effort: 'low' },
             'effort defaults to `high` on Sonnet 5 — it must be pinned explicitly');
-        assert.ok(captured.body.max_tokens >= 4096,
-            `max_tokens ${captured.body.max_tokens} leaves no room for thinking + answer`);
+        assert.ok(body.max_tokens >= 4096,
+            `max_tokens ${body.max_tokens} leaves no room for thinking + answer`);
     });
 
     test('keeps the 1h prompt-cache breakpoint on the knowledge base', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         await ask({ question: 'test' });
-        const kb = captured.body.system[1];
+        const kb = mock.captured().body.system[1];
         assert.deepEqual(
             kb.cache_control,
             { type: 'ephemeral', ttl: '1h' },
@@ -175,11 +99,25 @@ describe('the request sent to the Anthropic API', () => {
         assert.ok(kb.text.length > 100000, `knowledge base looks truncated (${kb.text.length} chars)`);
     });
 
+    // The three public data files alone clear the size check above, so a
+    // renamed or dropped corpus would pass it; only its own heading proves it
+    // is in the prompt. And only the text inside the template literal is
+    // prompt material — the JS wrapper was being billed as cached tokens.
+    test('grounds the model in the Yamaha factory manual, without the JS wrapper', async () => {
+        mock.setMode('ok');
+        await ask({ question: 'test' });
+        const kb = mock.captured().body.system[1];
+        assert.match(kb.text, /YAMAHA FACTORY SERVICE MANUAL REFERENCE/,
+            'kb/yamahaManuals.js is missing from the grounding prompt');
+        assert.ok(!kb.text.includes('window.yamahaManualReference'),
+            'the corpus file\'s JS wrapper must be stripped before it is sent');
+    });
+
     test('clamps oversized client context instead of forwarding it', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         const huge = 'z'.repeat(5000);
         await ask({ question: 'test', context: { tree: huge, node: huge } });
-        const runs = captured.body.messages[0].content.match(/z+/g) || [];
+        const runs = mock.captured().body.messages[0].content.match(/z+/g) || [];
         assert.ok(runs.length > 0, 'context was dropped entirely');
         for (const run of runs) {
             assert.ok(run.length <= 120, `context field reached ${run.length} chars — the 120-char clamp is gone`);
@@ -187,9 +125,31 @@ describe('the request sent to the Anthropic API', () => {
     });
 });
 
+describe('what the admin dashboard can see afterwards', () => {
+    // tokens_in sums input + cache read + cache write, so a request that READ
+    // 90K cached tokens and one that WROTE them look identical there. The
+    // split columns are how an operator notices the breakpoint stopped landing.
+    test('prompt-cache reads are recorded apart from cache writes', async () => {
+        mock.setMode('ok');
+        assert.equal((await ask({ question: 'cache accounting' })).status, 200);
+
+        const o = await overview();
+        const row = o.recentAi[0];
+        assert.equal(row.question, 'cache accounting');
+        assert.equal(row.cache_read, 90000, 'cache_read must mirror usage.cache_read_input_tokens');
+        assert.equal(row.cache_write, 0, 'a real 0 write must be stored as 0, not dropped');
+        assert.equal(row.tokens_in, 12 + 90000, 'tokens_in keeps the historical sum');
+        assert.equal(row.tokens_out, 8);
+
+        assert.ok(o.summary.last24h.aiCacheReadTokens >= 90000,
+            `aiCacheReadTokens ${o.summary.last24h.aiCacheReadTokens} should include this request`);
+        assert.equal(typeof o.summary.last24h.aiCacheWriteTokens, 'number');
+    });
+});
+
 describe('degenerate responses never reach the tech as a blank panel', () => {
     test('a refusal (no content blocks) is reported, not returned as success', async () => {
-        mockMode = 'refusal';
+        mock.setMode('refusal');
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 502, 'an empty answer must not be a 200 success');
         const body = await res.json();
@@ -198,58 +158,64 @@ describe('degenerate responses never reach the tech as a blank panel', () => {
     });
 
     test('a turn that spent its whole budget thinking is reported as a length problem', async () => {
-        mockMode = 'thinking-only';
+        mock.setMode('thinking-only');
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 502);
         assert.match((await res.json()).message, /length limit|narrower/i);
     });
 
-    test('a truncated but non-empty answer is still delivered, and flagged', async () => {
-        mockMode = 'truncated';
+    test('a truncated but non-empty answer is still delivered, flagged, and visible to admins', async () => {
+        mock.setMode('truncated');
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 200, 'a partial answer is better than none — deliver it');
         const body = await res.json();
         assert.equal(body.answer, 'Check the impel');
         assert.equal(body.truncated, true, 'truncation must be visible to the caller');
+
+        // The handler logs it "so it shows up in the admin panel" — the error
+        // panel, not the generic event feed where it scrolls off in minutes.
+        const o = await overview();
+        assert.ok(o.errors.some((e) => e.kind === 'ai_truncated'),
+            'ai_truncated must appear in the admin error panel');
     });
 });
 
 describe('upstream failures are mapped for the client', () => {
     test('rate limiting surfaces as 429, not a generic 500', async () => {
-        mockMode = '429';
+        mock.setMode('429');
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 429);
         assert.match((await res.json()).message, /busy|wait/i);
     });
 
     test('a bad API key surfaces as 503 so it reads as misconfiguration', async () => {
-        mockMode = '401';
+        mock.setMode('401');
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 503);
     });
 
     test('a server error is retried once, then reported as 500', async () => {
-        mockMode = '500';
-        upstreamHits = 0;
+        mock.setMode('500');
+        mock.resetHits();
         const res = await ask({ question: 'test' });
         assert.equal(res.status, 500);
-        assert.equal(upstreamHits, 2, 'expected maxRetries: 1 (one attempt + one retry)');
+        assert.equal(mock.hits(), 2, 'expected maxRetries: 1 (one attempt + one retry)');
     });
 });
 
 describe('request guards', () => {
     test('rejects an empty question', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         assert.equal((await ask({ question: '' })).status, 400);
     });
 
     test('rejects a question over the length cap', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         assert.equal((await ask({ question: 'x'.repeat(2500) })).status, 400);
     });
 
     test('requires authentication', async () => {
-        mockMode = 'ok';
+        mock.setMode('ok');
         const saved = cookie;
         cookie = '';
         try {
@@ -257,5 +223,45 @@ describe('request guards', () => {
         } finally {
             cookie = saved;
         }
+    });
+});
+
+describe('the Ask limiter is per user, not per IP', () => {
+    // Techs on one marina/shop NAT share an IP. With an IP-keyed bucket the
+    // fifth tech of the morning got "slow down" for questions other people
+    // asked. Break-glass has no user id and falls back to the IP bucket.
+    let s;
+    before(async () => {
+        s = await H.startServer({
+            env: {
+                ANTHROPIC_API_KEY: 'sk-ant-test-not-a-real-key',
+                ANTHROPIC_BASE_URL: mock.base,
+                ASK_RATE_PER_MIN: '2'
+            }
+        });
+        mock.setMode('ok');
+    });
+    after(async () => {
+        if (!s) return;
+        const { code } = await s.stop();
+        s.rm();
+        assert.equal(code, 0, `server should exit 0 on SIGTERM:\n${s.output()}`);
+    });
+
+    test('two sessions from the same IP get independent budgets', async () => {
+        const bg = await H.breakGlass(s.base);
+        const askAs = (c) => H.postJson(s.base, '/api/ask', { question: 'test' }, { cookie: c });
+
+        assert.equal((await askAs(bg)).status, 200);
+        assert.equal((await askAs(bg)).status, 200);
+        const third = await askAs(bg);
+        assert.equal(third.status, 429, 'the third question in a minute must hit the limiter');
+        assert.match((await third.json()).message, /slow down/i);
+
+        // Same IP, different (real) user: a fresh bucket.
+        const tech = await H.createApprovedUser(s.base, bg, 'tech@example.com', 'tech-password-123');
+        assert.equal((await askAs(tech.cookie)).status, 200, 'a tech behind the same NAT must not inherit the break-glass budget');
+        assert.equal((await askAs(tech.cookie)).status, 200);
+        assert.equal((await askAs(tech.cookie)).status, 429, 'the tech has their own budget, not an unlimited one');
     });
 });
