@@ -5,7 +5,7 @@
 // Each entry contains:
 //   code         - the fault code ID
 //   manufacturer - Mercury or Yamaha
-//   severity     - Warning, Alarm, or Shutdown
+//   severity     - Warning, Alarm, Shutdown, or Info (informational — not a fault)
 //   system       - which engine system
 //   description  - what the code means
 //   causes       - probable causes (separated by | characters)
@@ -85,10 +85,10 @@ window.faultCodeDatabase = [
         severity: "Warning",
         system: "Electrical",
         description: "Battery Voltage Low",
-        causes: "Weak or dead battery|Bad alternator or stator|Loose or corroded battery connections|Excessive electrical load|Failed rectifier and regulator",
-        steps: "Step 1: Check battery voltage with engine off — should be 12.4-12.8V.|Step 2: Start engine and check voltage at 1000+ RPM — should be 13.8-14.8V.|Step 3: If charging voltage is low, check alternator belt tension and condition.|Step 4: Check all battery cable connections for corrosion.|Step 5: Load test the battery.|Step 6: If charging output is low, test stator output and rectifier regulator.",
+        causes: "Weak or dead battery|Slipping, worn, or glazed alternator belt|Failed alternator (internal regulator)|Loose or corroded battery connections|Excessive electrical load|Open alternator excite/ignition wire or blown charging fuse",
+        steps: "Step 1: Check battery voltage with engine off — should be 12.4-12.8V.|Step 2: Start engine and check voltage at 1000+ RPM — should be 13.8-14.8V.|Step 3: If charging voltage is low, check alternator belt tension and condition.|Step 4: Check all battery cable connections for corrosion.|Step 5: Load test the battery.|Step 6: If charging output is still low with the belt OK, verify 12V key-ON at the alternator excite/ignition wire and a clean alternator case ground (voltage drop under 0.2V); if both are good, replace the alternator. Mercury 115–300 FourStroke / Verado use a belt-driven alternator with an internal regulator — there is no stator or separate rectifier/regulator to test.",
         tools: "DMM, battery load tester",
-        parts: "Battery, rectifier regulator, alternator belt"
+        parts: "Battery, alternator (internal regulator), alternator belt"
     },
 
     {
@@ -97,10 +97,10 @@ window.faultCodeDatabase = [
         severity: "Alarm",
         system: "Electrical",
         description: "Battery Voltage High — Overcharging",
-        causes: "Failed rectifier and regulator (regulator portion)|Loose connections causing voltage spikes",
-        steps: "Step 1: IMMEDIATELY check charging voltage at battery with engine running at 1000+ RPM.|Step 2: Voltage should NOT exceed 15.0V.|Step 3: If over 15V, the rectifier regulator has failed — STOP ENGINE.|Step 4: Overcharging will damage batteries and onboard electronics.|Step 5: Replace rectifier regulator. Check battery for swelling or heat damage.",
+        causes: "Failed alternator — internal voltage regulator failed|Loose or corroded battery / alternator connections causing voltage spikes",
+        steps: "Step 1: IMMEDIATELY check charging voltage at battery with engine running at 1000+ RPM.|Step 2: Voltage should NOT exceed 15.0V.|Step 3: If over 15V, the alternator's internal regulator has failed — STOP ENGINE.|Step 4: Overcharging will damage batteries and onboard electronics.|Step 5: Replace the alternator. On Mercury belt-driven alternators the regulator is internal and is not serviced separately — there is no stand-alone rectifier/regulator. Check battery for swelling or heat damage.",
         tools: "DMM",
-        parts: "Rectifier regulator, possibly new battery"
+        parts: "Alternator (internal regulator), possibly new battery"
     },
 
     {
@@ -186,6 +186,14 @@ window.faultCodeDatabase = [
     // "Yamaha code NN", first establish whether it came from
     // the YDS scan tool / gauge display (this series) or the
     // on-engine flash indicator (YAM-F series).
+    //
+    // The YAM-nn cards carry GENERIC, YDS-era values. Wherever a
+    // step quotes a number it is qualified by platform: "2014+
+    // platforms (verify with YDS)" for the templated current-model
+    // figures, versus the factory-manual figures for the F115C /
+    // F150TR / F200-F225 V6 — which the YAM-F-nn cards and the
+    // Engine Specs page carry. Never condemn a part on one of these
+    // generic numbers; check the Engine Specs entry for the engine.
     // =============================================
 
     {
@@ -219,7 +227,7 @@ window.faultCodeDatabase = [
         system: "Cooling",
         description: "Engine Overheat Warning",
         causes: "Blocked water intake|Failed water pump impeller|Thermostat stuck closed|Corroded cooling passages|Faulty temperature sensor giving false reading",
-        steps: "Step 1: Verify overheat is real — use IR thermometer on cylinder head. Normal operating temp: 140-180 degrees F.|Step 2: Check water intake screens on lower unit for blockage.|Step 3: Check tell-tale stream for flow.|Step 4: Inspect water pump impeller — pull lower unit to access.|Step 5: Test thermostat in hot water — should open at approximately 140 degrees F for Yamaha.|Step 6: Check temp sensor resistance against spec chart if temp seems actually normal.|Step 7: Inspect and clean the poppet valve and exhaust cooling passages.",
+        steps: "Step 1: Verify overheat is real — use IR thermometer on cylinder head. Normal operating temp: 140-180 degrees F.|Step 2: Check water intake screens on lower unit for blockage.|Step 3: Check tell-tale stream for flow.|Step 4: Inspect water pump impeller — pull lower unit to access.|Step 5: Test thermostat in hot water against the spec for THIS engine. Yamaha 2014+ platforms: opens at approximately 140 degrees F (verify with YDS). Factory manual: F115C opens 118–126°F (48–52°C), fully open 140°F; F150TR / F200 V6 opens 136–144°F (58–62°C), fully open 158°F — see Engine Specs.|Step 6: Check temp sensor resistance against spec chart if temp seems actually normal.|Step 7: Inspect and clean the poppet valve and exhaust cooling passages.",
         tools: "IR thermometer, impeller puller, DMM",
         parts: "Water pump impeller kit, thermostat, temperature sensor"
     },
@@ -231,7 +239,7 @@ window.faultCodeDatabase = [
         system: "Sensors",
         description: "Throttle Position Sensor Fault",
         causes: "Faulty TPS|TPS not calibrated|Damaged wiring|Throttle body binding|Corroded connector",
-        steps: "Step 1: Key ON engine OFF — check TPS voltage. Should be approximately 0.5V at closed, 4.5V at WOT.|Step 2: Slowly sweep throttle and watch for voltage dropouts or dead spots.|Step 3: Inspect TPS connector for corrosion.|Step 4: Check 5V reference and ground circuits from ECU.|Step 5: Calibrate TPS using YDS diagnostic tool.|Step 6: Replace TPS if signal is erratic.",
+        steps: "Step 1: Key ON engine OFF — check TPS voltage against the spec for THIS engine. 2014+ platforms: approximately 0.5V at closed, 4.5V at WOT (verify with YDS). Factory manual: F115C 0.732 ± 0.014 V at idle stop; F150TR 0.70 ± 0.02 V at idle (see YAM-F-18 / Engine Specs).|Step 2: Slowly sweep throttle and watch for voltage dropouts or dead spots.|Step 3: Inspect TPS connector for corrosion.|Step 4: Check 5V reference and ground circuits from ECU.|Step 5: Calibrate TPS using YDS diagnostic tool.|Step 6: Replace TPS if signal is erratic.",
         tools: "DMM, Yamaha YDS",
         parts: "Throttle position sensor"
     },
@@ -243,7 +251,7 @@ window.faultCodeDatabase = [
         system: "Fuel",
         description: "Fuel Injector Circuit Malfunction",
         causes: "Failed fuel injector|Wiring open or short|Corroded connector|ECU driver fault (rare)|Low fuel pressure contributing",
-        steps: "Step 1: Use YDS to identify the affected cylinder.|Step 2: Check injector resistance — should be 11.6-12.4 ohms at 68 degrees F for Yamaha EFI.|Step 3: Check for 12V supply to injector harness with key ON.|Step 4: Check ECU ground-side pulse with a noid light while cranking.|Step 5: Inspect the injector connector for corrosion.|Step 6: Swap the injector with a known-good cylinder to confirm the injector is the problem.",
+        steps: "Step 1: Use YDS to identify the affected cylinder.|Step 2: Check injector resistance against the spec for THIS engine. 2014+ platforms: 11.6-12.4 ohms at 68 degrees F (verify with YDS). Factory manual: F150TR / F200 V6 14.0–15.0 Ω @ 20°C. Use the Engine Specs value before condemning an injector.|Step 3: Check for 12V supply to injector harness with key ON.|Step 4: Check ECU ground-side pulse with a noid light while cranking.|Step 5: Inspect the injector connector for corrosion.|Step 6: Swap the injector with a known-good cylinder to confirm the injector is the problem.",
         tools: "DMM, noid light, YDS",
         parts: "Fuel injector, injector O-rings"
     },
@@ -291,7 +299,7 @@ window.faultCodeDatabase = [
         system: "Ignition",
         description: "Ignition Coil Circuit Fault",
         causes: "Failed ignition coil|Carbon tracking on coil boot|Damaged coil wiring|Corroded connector|ECU driver issue (rare)",
-        steps: "Step 1: Identify affected cylinder from YDS.|Step 2: Inspect the coil boot for carbon tracking (black burned lines).|Step 3: Measure coil primary resistance: typically 0.2-0.5 ohms.|Step 4: Measure coil secondary resistance: typically 6K-10K ohms.|Step 5: Check coil connector for corrosion.|Step 6: Swap coil with adjacent known-good cylinder — if code follows the coil, replace it.",
+        steps: "Step 1: Identify affected cylinder from YDS.|Step 2: Inspect the coil boot for carbon tracking (black burned lines).|Step 3: Measure coil primary resistance — F150TR / F200 V6 (63P/69J): 1.53–2.07 Ω @ 20°C. Other Yamaha models: verify against the Engine Specs page / service manual before condemning a coil.|Step 4: Measure coil secondary resistance — F150TR / F200 V6: 12.5–16.9 kΩ @ 20°C. Other Yamaha models: verify against the Engine Specs page / service manual.|Step 5: Check coil connector for corrosion.|Step 6: Swap coil with adjacent known-good cylinder — if code follows the coil, replace it.",
         tools: "DMM, YDS",
         parts: "Ignition coil, coil boot, dielectric grease"
     },
@@ -303,7 +311,7 @@ window.faultCodeDatabase = [
         system: "Lubrication",
         description: "Oil Pressure Below Minimum — Engine Shutdown",
         causes: "Low oil level|Oil pressure switch failure|Oil pump worn|Clogged oil filter or pickup screen|Internal bearing failure",
-        steps: "Step 1: CHECK OIL LEVEL AND CONDITION IMMEDIATELY.|Step 2: Install a mechanical oil pressure gauge to verify actual pressure.|Step 3: Yamaha spec: idle 14+ PSI, WOT 43-71 PSI typical.|Step 4: If pressure reads good mechanically, replace the oil pressure switch.|Step 5: If low, inspect oil filter and pickup screen for blockage.|Step 6: Check oil for metal particles or shiny flakes — indicates bearing failure.|Step 7: Do NOT run engine with confirmed low oil pressure.",
+        steps: "Step 1: CHECK OIL LEVEL AND CONDITION IMMEDIATELY.|Step 2: Install a mechanical oil pressure gauge to verify actual pressure.|Step 3: Compare to the spec for THIS engine. 2014+ platforms: idle 14+ PSI, WOT 43-71 PSI typical (verify with YDS). Factory manual: F115C 343 kPa (49.8 PSI) at idle, F150TR 450 kPa (65.3 PSI) at idle, F200/F225 V6 650 kPa (94 PSI) at 700 rpm.|Step 4: If pressure reads good mechanically, replace the oil pressure switch.|Step 5: If low, inspect oil filter and pickup screen for blockage.|Step 6: Check oil for metal particles or shiny flakes — indicates bearing failure.|Step 7: Do NOT run engine with confirmed low oil pressure.",
         tools: "Mechanical oil pressure gauge, DMM",
         parts: "Oil pressure switch, oil filter, engine oil"
     },
@@ -327,7 +335,7 @@ window.faultCodeDatabase = [
         system: "Ignition",
         description: "Misfire Detected",
         causes: "Fouled spark plug|Failed ignition coil|Bad fuel injector|Low compression|Water in fuel|Vacuum leak",
-        steps: "Step 1: Use YDS to identify which cylinder is misfiring (if possible).|Step 2: Pull and inspect spark plugs on all cylinders — check gap (0.039-0.043 inch), look for fouling.|Step 3: Swap coil with adjacent cylinder — if misfire moves, replace the coil.|Step 4: Check injector resistance (11.6-12.4 ohms at 68 degrees F).|Step 5: Check fuel pressure — low pressure causes lean misfires.|Step 6: Compression test if all ignition and fuel checks pass.",
+        steps: "Step 1: Use YDS to identify which cylinder is misfiring (if possible).|Step 2: Pull and inspect spark plugs on all cylinders — check gap (0.039-0.043 inch), look for fouling.|Step 3: Swap coil with adjacent cylinder — if misfire moves, replace the coil.|Step 4: Check injector resistance against the spec for this engine (2014+ platforms: 11.6-12.4 ohms at 68 degrees F — verify with YDS; F150TR / F200 V6: 14.0–15.0 Ω @ 20°C).|Step 5: Check fuel pressure — low pressure causes lean misfires.|Step 6: Compression test if all ignition and fuel checks pass.",
         tools: "DMM, spark plug socket, YDS, compression tester",
         parts: "Spark plugs, ignition coil, fuel injector"
     },
@@ -401,7 +409,7 @@ window.faultCodeDatabase = [
     {
         code: "YAM-F-1",
         manufacturer: "Yamaha",
-        severity: "Warning",
+        severity: "Info",
         system: "General",
         description: "Normal — no faults detected",
         causes: "This is the normal idle state of the self-diagnosis indicator|Single flash every 4.95 seconds",
@@ -513,7 +521,7 @@ window.faultCodeDatabase = [
         system: "Lubrication",
         description: "Incorrect oil pressure sensor signal",
         causes: "Low oil level|Faulty oil pressure sensor/switch|Failing oil pump|Blocked oil strainer|Stuck relief valve|Diluted/contaminated oil|Wiring fault",
-        steps: "Step 1: FIRST — stop the engine and check oil level on the dipstick. Low oil is the most common cause and running further can destroy the engine.|Step 2: Remove the oil pressure sensor and install a mechanical oil pressure gauge. F115 reference: 350 kPa (49.8 PSI) @ idle, 55°C. F150: 450 kPa (65.3 PSI) @ idle. F200: ~650 kPa at 700 rpm.|Step 3: If mechanical pressure is low, check oil strainer for blockage and inspect the oil pump. Relief valve opens at 490 kPa (F115).|Step 4: If mechanical pressure is normal but the code persists, the sensor is faulty or wiring is damaged — replace the sensor.|Step 5: If oil is diluted with fuel or water, find the cause (leaking injector, head gasket, cooling leak) before returning to service.",
+        steps: "Step 1: FIRST — stop the engine and check oil level on the dipstick. Low oil is the most common cause and running further can destroy the engine.|Step 2: Remove the oil pressure sensor and install a mechanical oil pressure gauge. F115 reference: 343 kPa (49.8 PSI) @ idle, 55°C. F150: 450 kPa (65.3 PSI) @ idle. F200: ~650 kPa at 700 rpm.|Step 3: If mechanical pressure is low, check oil strainer for blockage and inspect the oil pump. Relief valve opens at 490 kPa (F115).|Step 4: If mechanical pressure is normal but the code persists, the sensor is faulty or wiring is damaged — replace the sensor.|Step 5: If oil is diluted with fuel or water, find the cause (leaking injector, head gasket, cooling leak) before returning to service.",
         tools: "Oil pressure gauge, YDS, DMM",
         parts: "Oil pressure sensor/switch, oil filter, engine oil, oil pump (if confirmed)"
     },
@@ -557,7 +565,7 @@ window.faultCodeDatabase = [
     {
         code: "YAM-F-49",
         manufacturer: "Yamaha",
-        severity: "Warning",
+        severity: "Info",
         system: "Ignition",
         description: "Ignition timing slightly corrected (F115 only — informational, cold start)",
         causes: "ECM applied cold-start ignition correction|This is informational and normal on cold-start F115",

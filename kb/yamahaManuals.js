@@ -1,4 +1,4 @@
-// js/yamahaManuals.js
+// kb/yamahaManuals.js
 //
 // Yamaha factory service manual reference corpus.
 // Compiled from:
@@ -6,13 +6,25 @@
 //   - Yamaha F150TR / LF150TR (63P1F11)
 //   - Yamaha F200TR / LF200TR / F225TR / LF225TR (69J1D11)
 //
-// This file is loaded at server startup into the Ask-a-Tech AI
-// system prompt (cache_control: ephemeral) so the assistant can
-// ground answers in factory specs for these platforms.
+// SERVER-SIDE ONLY. This file lives in kb/ deliberately: server.js
+// (loadKB) reads it at startup and splices the text into the
+// Ask-a-Tech system prompt (cache_control: ephemeral) so the
+// assistant can ground answers in factory specs for these platforms.
+// It is never served to a browser — nothing under public/ references
+// window.yamahaManualReference — so do NOT move it under public/js/.
 //
-// It's a JS string on window.yamahaManualReference so it is
-// served under the same auth as the other KB files and can
-// optionally be rendered client-side in the future.
+// Keep the `window.yamahaManualReference = \`...\`;` wrapper shape:
+// the server strips everything up to and including the opening
+// backtick and the trailing "`;" when it builds the prompt, so this
+// header and the wrapper are not billed as prompt tokens.
+//
+// Unit pairs: TORQUE values are kept exactly as the factory manual
+// prints them (Yamaha rounds Nm from m·kgf, so a printed Nm / ft-lb
+// pair can disagree by ~2–3 % — that is the manual's rounding, not a
+// transcription error; do not "correct" it). PRESSURE pairs (kPa / PSI)
+// were normalised so a kPa gauge and a PSI gauge give the same
+// pass/fail — see the F115C compression note in §2. `npm run validate`
+// checks every such pair (pressure within 1.5 PSI, torque within 3 %).
 
 window.yamahaManualReference = `
 ================================================================
@@ -126,8 +138,10 @@ F115C
   - Thermostat opens: 48–52 °C (118–126 °F); full open 60 °C (140 °F);
     valve open lower limit 4.3 mm
   - Idling speed: 750 ± 50 r/min
-  - Minimum compression pressure: 950 kPa (9.5 kgf/cm², 135 PSI)
-    [ambient 20 °C / 68 °F, WOT, plugs removed from all cylinders]
+  - Minimum compression pressure: 931 kPa (9.5 kgf/cm², 135 PSI)
+    [ambient 20 °C / 68 °F, WOT, plugs removed from all cylinders.
+     Some printings round this to 950 kPa; 9.5 kgf/cm² = 931 kPa = 135 PSI,
+     so a PSI gauge and a kPa gauge agree on the 135 PSI floor]
 
 F150TR
   - Cylinder head warpage limit: 0.10 mm
@@ -149,7 +163,7 @@ F200TR / F225TR
   - Piston pin outside dia: 21.00 mm
   - Oil pump relief valve opens: 529–647 kPa
   - Thermostat opens: 58–62 °C (136–144 °F); full open 70 °C (158 °F)
-  - Minimum compression pressure: 880 kPa (125 PSI)
+  - Minimum compression pressure: 880 kPa (128 PSI) — same figure as the F150TR
   - Lubrication oil pressure: 650 kPa (94 PSI) at 700 r/min
 
 ----------------------------------------------------------------
@@ -438,14 +452,17 @@ A. Engine won't start
    - Watch flash codes while cranking
    - No spark → measure pulser peak voltage and primary coil
    - No fuel → check VST, main filter, fuel pressure
-   - Compression < 880 kPa (F150/F200) or 950 kPa (F115) → internal
+   - Compression below the factory minimum → internal: 880 kPa (128 PSI)
+     on F150/F200, 931 kPa (135 PSI) on F115C. Do not condemn an engine
+     against a generic "normal" band — use this engine's own minimum.
 
 B. Engine overheats
    - STOP engine; never run raw-water-cooled dry
    - Tell-tale flow check; raw water intake clear
    - Thermostat bench test (see §8)
    - Impeller inspection and replacement
-   - Thermoswitch (code 46) bench test in hot water
+   - Thermoswitch (code 46 — F150/F200 only; the F115C 68V chart has no
+     code 46, its temp-sensor code is 15) bench test in hot water
 
 C. Engine won't exceed 2000 rpm
    - Read flash codes immediately — fail-safe is almost always active

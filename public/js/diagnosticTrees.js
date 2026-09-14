@@ -285,7 +285,7 @@ window.defined_trees = {
                 id: "weak_spark",
                 type: "instruction",
                 text: "Spark is present but weak or intermittent.",
-                help: "Coil specs — Mercury: Primary 0.3-0.6 ohms, Secondary 5K-8K ohms. Yamaha: Primary 0.2-0.5 ohms, Secondary 6K-10K ohms.",
+                help: "Coil specs — Mercury: Primary 0.3-0.6 ohms, Secondary 5K-8K ohms. Yamaha F150TR / F200 V6 (63P/69J) factory manual: Primary 1.53–2.07 Ω, Secondary 12.5–16.9 kΩ @ 20°C. Other Yamaha models: verify against the Engine Specs page / service manual before condemning a coil.",
                 checklist: [
                     "Inspect spark plug — gap, fouling, cracked porcelain",
                     "Check coil boot for carbon tracking",
@@ -411,7 +411,7 @@ window.defined_trees = {
                 id: "fuel_pressure_ok",
                 type: "instruction",
                 text: "Good spark AND good fuel pressure. Check injectors and compression.",
-                measurement: { label: "Compression (PSI per cylinder)", unit: "PSI", expectedRange: "170-210, within 10%" },
+                measurement: { label: "Compression (PSI per cylinder) — compare to THIS engine's minimum in Engine Specs", unit: "PSI", expectedRange: "at or above the engine's own minimum, all cylinders within 10%. Factory minimums — Mercury 115/150 I4: 170 | Mercury V8: 160 | Verado: 150 | Yamaha F115C: 135 | Yamaha F150TR / F150 / F200 V6: 128" },
                 checklist: [
                     "Use a NOID LIGHT on injector connector — crank and watch for blinking",
                     "If noid blinks, do compression test on all cylinders"
@@ -446,8 +446,8 @@ window.defined_trees = {
             low_compression: {
                 id: "low_compression",
                 type: "instruction",
-                text: "Low compression. Normal is 170-210 PSI.",
-                help: "Do a WET TEST: add oil to the low cylinder and retest. If it improves = rings. If not = valves.",
+                text: "Low compression — below the minimum for THIS engine (see Engine Specs → compressionMin). Do NOT condemn an engine against a generic 170-210 PSI band: the factory minimums are Mercury 115/150 I4 170 PSI, Mercury V8 160, Verado 150, Yamaha F115C 135, Yamaha F150TR / F150 / F200 V6 128.",
+                help: "First confirm the reading really is below this engine's own minimum (a Yamaha F150 at 150 PSI is healthy). Then do a WET TEST: add oil to the low cylinder and retest. If it improves = rings. If not = valves.",
                 options: [
                     { label: "Worn rings (wet test improved)", next: "fix_internal" },
                     { label: "Valve problem (wet test no change)", next: "fix_internal" },
@@ -520,7 +520,7 @@ window.defined_trees = {
 
             fix_hydrolock: { id: "fix_hydrolock", type: "resolution", severity: "CRITICAL", title: "ENGINE HYDRO-LOCKED", text: "Water in cylinders preventing engine from turning.", action: "Remove ALL spark plugs. Crank to expel water. Find water source. Fog cylinders with oil before reinstalling plugs. Listen for rod knock on first start.", warning: "DO NOT force a hydro-locked engine. Will bend connecting rods.", partsNeeded: ["Fogging oil", "New spark plugs", "Rags"], estimatedTime: "1-4 hours" },
 
-            fix_plugs: { id: "fix_plugs", type: "resolution", severity: "LOW", title: "Spark Plug Replacement", text: "Spark plugs fouled or worn.", action: "Replace ALL as a set. Gap to spec. Anti-seize on threads. Torque to 13 lb-ft.", help: "Mercury: typically NGK LZKAR6AP-11. Yamaha: typically NGK LKR7E. VERIFY for your engine.", partsNeeded: ["Full set spark plugs", "Anti-seize", "Torque wrench"], estimatedTime: "30-60 minutes" },
+            fix_plugs: { id: "fix_plugs", type: "resolution", severity: "LOW", title: "Spark Plug Replacement", text: "Spark plugs fouled or worn.", action: "Replace ALL as a set. Gap to spec. Anti-seize on threads. Torque to the spec for THIS engine (see Engine Specs): Mercury 115 / 150 / V8 13 lb-ft, Verado 18 lb-ft; Yamaha 2014+ platforms 13 lb-ft; Yamaha F115C / F150TR / F200 V6 factory manual 25 Nm (18 ft-lb).", help: "Plug type — Mercury 115/150: typically NGK LZKAR6AP-11; Mercury V8: NGK DILKAR7G-11GS; Verado: Champion RC10PYP4. Yamaha 2014+ F115/F150: typically NGK LKR7E; F250 4.2L: NGK LZKAR7A. Yamaha factory manual: F115C NGK LFR6A-11; F150TR / F200 V6 NGK LFR5A-11. VERIFY for your engine and serial number.", partsNeeded: ["Full set spark plugs", "Anti-seize", "Torque wrench"], estimatedTime: "30-60 minutes" },
 
             fix_coils: { id: "fix_coils", type: "resolution", severity: "MEDIUM", title: "Ignition Coil Replacement", text: "Coil(s) failed or carbon tracking on boot.", action: "Replace coil(s). Dielectric grease in boot. Clear codes. Test run.", partsNeeded: ["Ignition coil(s)", "Dielectric grease"], estimatedTime: "20-45 min per coil" },
 
@@ -550,7 +550,7 @@ window.defined_trees = {
 
             fix_internal: { id: "fix_internal", type: "resolution", severity: "CRITICAL", title: "Internal Engine Damage", text: "Low compression indicates internal wear or damage.", action: "Document all readings and engine hours. Beyond field repair. Do NOT run engine.", estimatedTime: "Shop service" },
 
-            fix_check_codes: { id: "fix_check_codes", type: "resolution", severity: "MEDIUM", title: "Fault Codes Found", text: "Engine reporting fault codes.", action: "Go to the Fault Code Lookup page from the home screen. Enter the codes shown on the display." },
+            fix_check_codes: { id: "fix_check_codes", type: "resolution", severity: "MEDIUM", title: "Fault Codes Found", text: "Engine reporting fault codes.", action: "Go to the Fault Code Lookup page from the home screen. Enter the codes shown on the display.", jumpTo: { href: "/fault-codes.html", label: "Open Fault Code Lookup" } },
 
             fix_maintainer: { id: "fix_maintainer", type: "resolution", severity: "LOW", title: "Battery Maintainer Recommended", text: "Battery drains from sitting between uses.", action: "Install onboard battery maintainer. Good brands: ProMariner, Guest, NOCO.", partsNeeded: ["Onboard battery maintainer"], estimatedTime: "30-60 min to install" },
 
@@ -683,7 +683,7 @@ window.defined_trees = {
                 text: "Engine is genuinely overheating despite water flow. Check thermostat.",
                 checklist: [
                     "Remove thermostat — test in pot of hot water with thermometer",
-                    "Mercury: should open at 143F. Yamaha: should open at 140F.",
+                    "Mercury: should open at 143°F. Yamaha 2014+ platforms: 140°F (verify with YDS). Yamaha factory manual: F115C opens 118–126°F (48–52°C), fully open 140°F; F150TR / F200 V6 opens 136–144°F (58–62°C), fully open 158°F. See Engine Specs for THIS engine.",
                     "Check for salt/scale buildup in cooling passages",
                     "Check for possible head gasket leak (exhaust bubbles in cooling)"
                 ],
@@ -812,7 +812,7 @@ window.defined_trees = {
                 text: "Rough at idle. Connect scan tool and check for codes and live data.",
                 checklist: [
                     "Check for DTCs and look at misfire counts",
-                    "Check idle RPM — Mercury: 600-700 in neutral. Yamaha: 600-700 in neutral.",
+                    "Check idle RPM in neutral against Engine Specs — Mercury 115–300: 600-700. Yamaha 2014+ platforms: 600-700 typical (F115 650-700, F300 600-650 — verify with YDS). Yamaha factory manual: F115C 750 ± 50, F150TR 700 ± 50, F200/F225 V6 650-750.",
                     "Look for vacuum leaks — spray carb cleaner around intake gaskets while idling. RPM change = leak.",
                     "Check spark plugs condition"
                 ],
@@ -831,7 +831,7 @@ window.defined_trees = {
                 checklist: [
                     "Spray carb cleaner around intake gaskets — RPM change = vacuum leak",
                     "Check IAC (Idle Air Control) valve — remove and clean or replace",
-                    "Check TPS — is it reading correct idle voltage (about 0.5V)?",
+                    "Check TPS idle voltage against the spec for THIS engine — Yamaha 2014+ platforms: about 0.5V (verify with YDS); Yamaha factory manual: F115C 0.732 ± 0.014 V, F150TR 0.70 ± 0.02 V. Mercury: verify with CDS G3.",
                     "Check for water in fuel",
                     "Check engine grounds"
                 ],
@@ -862,7 +862,7 @@ window.defined_trees = {
                 checklist: [
                     "Remove and inspect spark plug — gap, fouling, damage",
                     "Swap coil with adjacent known-good cylinder. Misfire follows coil = bad coil.",
-                    "Check injector resistance (Mercury: 12-16 ohms. Yamaha: 11.6-12.4 ohms)",
+                    "Check injector resistance against Engine Specs — Mercury: 12-16 ohms. Yamaha 2014+ platforms: 11.6-12.4 ohms (verify with YDS). Yamaha factory manual F150TR / F200 V6: 14.0–15.0 Ω @ 20°C — do not condemn an injector against the wrong platform's number.",
                     "Swap injector to another cylinder. Misfire follows = bad injector.",
                     "Compression test that cylinder"
                 ],
@@ -996,7 +996,7 @@ window.defined_trees = {
 
             rr_fix_iac: { id: "rr_fix_iac", type: "resolution", severity: "LOW", title: "IAC Valve Service", text: "Idle Air Control valve dirty or stuck.", action: "Remove IAC valve. Clean with throttle body cleaner. Inspect pintle for carbon. Reinstall or replace. Do idle relearn with scan tool.", partsNeeded: ["Throttle body cleaner", "IAC valve if replacing"], estimatedTime: "30-60 minutes" },
 
-            rr_fix_tps: { id: "rr_fix_tps", type: "resolution", severity: "LOW", title: "TPS Adjustment/Replacement", text: "Throttle Position Sensor out of calibration.", action: "Check TPS voltage at idle (about 0.5V). Recalibrate with scan tool. Replace if erratic on sweep test. Do TPS learn after replacement.", partsNeeded: ["TPS sensor if replacing"], estimatedTime: "30-60 minutes" },
+            rr_fix_tps: { id: "rr_fix_tps", type: "resolution", severity: "LOW", title: "TPS Adjustment/Replacement", text: "Throttle Position Sensor out of calibration.", action: "Check TPS voltage at idle against the spec for THIS engine — Yamaha 2014+ platforms about 0.5V (verify with YDS); Yamaha factory manual F115C 0.732 ± 0.014 V, F150TR 0.70 ± 0.02 V (rotate the TPS to spec, see the Yamaha Flash-Code tree). Recalibrate with scan tool. Replace if erratic on sweep test. Do TPS learn after replacement.", partsNeeded: ["TPS sensor if replacing"], estimatedTime: "30-60 minutes" },
 
             rr_fix_injector: { id: "rr_fix_injector", type: "resolution", severity: "MEDIUM", title: "Fuel Injector Replacement/Cleaning", text: "Fuel injector(s) failed or clogged.", action: "Replace or professionally clean injectors. Replace O-rings. Check fuel rail for debris. Clear codes. Verify spray pattern.", partsNeeded: ["Fuel injector(s)", "Injector O-rings"], estimatedTime: "1-2 hours" },
 
@@ -1004,7 +1004,7 @@ window.defined_trees = {
 
             rr_fix_monitor: { id: "rr_fix_monitor", type: "resolution", severity: "LOW", title: "Intermittent — Continue Monitoring", text: "Could not reproduce the problem.", action: "Document all checks performed. Recommend customer note exact conditions when it happens: RPM, speed, temperature, duration. Schedule a follow-up sea trial if possible." },
 
-            fix_check_codes: { id: "fix_check_codes", type: "resolution", severity: "MEDIUM", title: "Pull Fault Codes First", text: "Stored or pending codes will identify the affected sensor or system.", action: "Connect Mercury CDS G3 or Yamaha YDS and pull all stored and pending codes. Look the code up in the Fault Codes reference. If no codes are present and the rough running persists, escalate to compression and fuel pressure tests.", partsNeeded: [], estimatedTime: "15-30 minutes" },
+            fix_check_codes: { id: "fix_check_codes", type: "resolution", severity: "MEDIUM", title: "Pull Fault Codes First", text: "Stored or pending codes will identify the affected sensor or system.", action: "Connect Mercury CDS G3 or Yamaha YDS and pull all stored and pending codes. Look the code up in the Fault Codes reference. If no codes are present and the rough running persists, escalate to compression and fuel pressure tests.", partsNeeded: [], estimatedTime: "15-30 minutes", jumpTo: { href: "/fault-codes.html", label: "Open Fault Code Lookup" } },
 
             fix_water_fuel: { id: "fix_water_fuel", type: "resolution", severity: "MEDIUM", title: "Water in Fuel", text: "Water-fuel separator is full or fuel is contaminated.", action: "Drain the water-fuel separator. Replace the filter element. Inspect tank pickup for water at the bottom. If contamination is heavy, polish or pump the fuel and replace the entire filter system. Check the deck fill O-ring and tank vent for water intrusion paths.", partsNeeded: ["Water-fuel separator filter element", "Deck fill O-ring (if leaking)"], estimatedTime: "30-90 minutes" },
 
@@ -1018,7 +1018,22 @@ window.defined_trees = {
 
             fix_ground: { id: "fix_ground", type: "resolution", severity: "MEDIUM", title: "Ground Connection Repair", text: "Ground point is corroded or loose.", action: "Locate the engine ground stud. Remove the ground lug, sand the contact surface bright. Replace any green or corroded eyelets with new tinned ring terminals. Torque to spec. Apply dielectric grease over the connection. Verify with a voltage drop test (less than 0.2V under load).", partsNeeded: ["Tinned ring terminals", "Dielectric grease", "Sandpaper"], estimatedTime: "30-60 minutes" },
 
-            check_fuel: { id: "check_fuel", type: "resolution", severity: "LOW", title: "Check Fuel Quality and Supply", text: "Bad or stale fuel is a common rough-running cause.", action: "Pull a sample from the water-fuel separator. Check for water, debris, or phase-separated ethanol. If fuel is over 60 days old without stabilizer, recommend draining and replacing. Verify the tank pickup is clean and the vent is open.", partsNeeded: ["Fresh fuel", "Fuel stabilizer", "Replacement filter element if drained"], estimatedTime: "30-60 minutes" },
+            check_fuel: {
+                id: "check_fuel",
+                type: "instruction",
+                text: "Check fuel supply and quality. Connect a fuel pressure gauge to the rail test port, and pull a sample from the water-fuel separator.",
+                help: "Mercury typical: 39-42 PSI. Yamaha typical: 36-44 PSI. Bad or stale fuel is a common rough-running cause — look for water, debris, or phase-separated ethanol in the sample.",
+                measurement: { label: "Fuel Rail Pressure", unit: "PSI", expectedRange: "36-44" },
+                options: [
+                    { label: "Low or no pressure — filter restricted or overdue", next: "fix_filter" },
+                    { label: "Low pressure — filter OK (pump / regulator / supply)", next: "low_fuel_pressure" },
+                    { label: "Pressure recovers when the deck fill cap is loosened — vent blocked", next: "fix_vent" },
+                    { label: "Pressure OK — water or debris in the sample", next: "fix_water_fuel" },
+                    { label: "Pressure OK — fuel is stale (over 60 days, no stabilizer)", next: "rr_fix_stale_fuel" }
+                ]
+            },
+
+            rr_fix_stale_fuel: { id: "rr_fix_stale_fuel", type: "resolution", severity: "LOW", title: "Stale Fuel — Drain and Replace", text: "Bad or stale fuel is a common rough-running cause.", action: "If fuel is over 60 days old without stabilizer, recommend draining and replacing. Verify the tank pickup is clean and the vent is open. Replace the separator element after refilling.", partsNeeded: ["Fresh fuel", "Fuel stabilizer", "Replacement filter element if drained"], estimatedTime: "30-60 minutes" },
 
             fix_filter: { id: "fix_filter", type: "resolution", severity: "LOW", title: "Replace Fuel Filter(s)", text: "Fuel filter is restricted.", action: "Replace the primary water-fuel separator element AND any on-engine high-pressure filter per service interval. Prime the system. Re-test fuel pressure under load.", partsNeeded: ["Water-fuel separator element", "On-engine fuel filter"], estimatedTime: "30-60 minutes" },
 
@@ -1069,15 +1084,62 @@ window.defined_trees = {
                 ],
                 options: [
                     { label: "Charging voltage good (13.8-14.8V) — battery or drain issue", next: "parasitic_draw" },
-                    { label: "Not charging — stays at 12V or below with engine running", next: "ch_not_charging" },
+                    { label: "Not charging — stays at 12V or below with engine running", next: "ch_which_engine" },
                     { label: "Battery failed load test", next: "fix_battery" }
+                ]
+            },
+
+            parasitic_draw: {
+                id: "parasitic_draw",
+                type: "instruction",
+                text: "Charging is good but the battery keeps dying. Something is draining it when the engine is off.",
+                help: "Disconnect NEGATIVE cable. Set DMM to AMPS. Connect between battery post and cable. Wait 5 min for computers to sleep. Read the draw.",
+                measurement: { label: "Parasitic Draw", unit: "milliamps", expectedRange: "Under 50 mA" },
+                checklist: [
+                    "If over 50mA, pull fuses one at a time to find the draining circuit",
+                    "Common culprits: stereo memory, GPS/MFD, bilge auto switch, LED lights, dock-side phantom load"
+                ],
+                options: [
+                    { label: "Found the draining circuit — fixed it", next: "fix_simple" },
+                    { label: "Draw is normal — battery is just old", next: "fix_battery" },
+                    { label: "Draw is normal — boat sits too long", next: "fix_maintainer" }
+                ]
+            },
+
+            ch_which_engine: {
+                id: "ch_which_engine",
+                type: "question",
+                text: "Which engine? The charging systems are different — Mercury 115–300 FourStroke / Verado use a belt-driven alternator with an internal regulator; Yamaha uses a flywheel stator with a separate rectifier/regulator.",
+                options: [
+                    { label: "Mercury (belt-driven alternator)", next: "ch_not_charging_merc" },
+                    { label: "Yamaha (stator + rectifier/regulator)", next: "ch_not_charging" }
+                ]
+            },
+
+            ch_not_charging_merc: {
+                id: "ch_not_charging_merc",
+                type: "instruction",
+                text: "Mercury — engine runs but not charging. System: Belt → Alternator (internal regulator) → Battery. There is NO stator or separate rectifier/regulator to test, and no flywheel to pull.",
+                checklist: [
+                    "Inspect the alternator belt — cracks, glazing, oil contamination, correct tension. A slipping belt is the #1 cause.",
+                    "Engine running at ~1000 RPM: measure DC volts at the battery, then at the alternator B+ output stud — should read 13.8-14.8V. B+ good but battery low = charging cable or fuse.",
+                    "Key ON, engine OFF: verify 12V on the alternator excite / ignition wire (small terminal) — no excite voltage = no output.",
+                    "Voltage drop test, alternator case to battery negative while running — under 0.2V. A bad ground kills output.",
+                    "Check the charging fuse / main engine fuse on the B+ lead."
+                ],
+                measurement: { label: "Alternator B+ output at ~1000 RPM", unit: "VDC", expectedRange: "13.8-14.8" },
+                options: [
+                    { label: "Belt loose, glazed, cracked, or missing", next: "ch_fix_belt" },
+                    { label: "Belt OK, excite and ground OK — output still low or zero", next: "ch_fix_alternator" },
+                    { label: "No excite voltage, blown fuse, or bad charging cable — wiring", next: "fix_wiring" },
+                    { label: "Bad alternator ground", next: "fix_ground" }
                 ]
             },
 
             ch_not_charging: {
                 id: "ch_not_charging",
                 type: "instruction",
-                text: "Engine runs but not charging. System: Stator → Rectifier/Regulator → Battery.",
+                text: "Yamaha — engine runs but not charging. System: Stator → Rectifier/Regulator → Battery.",
                 checklist: [
                     "Check wiring from engine to battery — trace the charging wire",
                     "Check for blown charging fuse",
@@ -1098,7 +1160,7 @@ window.defined_trees = {
                 type: "instruction",
                 text: "Low voltage alarm while running.",
                 options: [
-                    { label: "Check charging system", next: "ch_not_charging" },
+                    { label: "Check charging system", next: "ch_which_engine" },
                     { label: "Check for excessive electrical load", next: "ch_fix_load" },
                     { label: "Check battery connections", next: "ch_battery_dying" }
                 ]
@@ -1111,7 +1173,7 @@ window.defined_trees = {
                 warning: "If battery is swollen, hot, or smells like rotten eggs, disconnect carefully. Wear safety glasses and gloves.",
                 measurement: { label: "Charging Voltage", unit: "VDC", expectedRange: "Should NOT exceed 15.0V" },
                 options: [
-                    { label: "Over 15V — rectifier/regulator failed", next: "ch_fix_rectifier_urgent" },
+                    { label: "Over 15V — regulator failed (Yamaha rectifier/regulator; Mercury alternator)", next: "ch_fix_rectifier_urgent" },
                     { label: "Voltage normal — battery has internal short", next: "fix_battery" }
                 ]
             },
@@ -1189,7 +1251,7 @@ window.defined_trees = {
                 type: "instruction",
                 text: "Lights dim at idle but brighten at higher RPM. Charging system can't keep up at low RPM.",
                 options: [
-                    { label: "Check charging output at idle", next: "ch_not_charging" },
+                    { label: "Check charging output at idle", next: "ch_which_engine" },
                     { label: "Excessive electrical load", next: "ch_fix_load" },
                     { label: "Bad battery pulling system down", next: "fix_battery" },
                     { label: "High resistance connections", next: "fix_cables" }
@@ -1201,7 +1263,11 @@ window.defined_trees = {
 
             ch_fix_rectifier: { id: "ch_fix_rectifier", type: "resolution", severity: "MEDIUM", title: "Rectifier/Regulator Failure", text: "Rectifier/regulator not converting stator output to DC charging.", action: "Replace rectifier/regulator. Check stator connector for heat damage. Test charging output: 13.8-14.8V at 1000+ RPM.", partsNeeded: ["Rectifier/regulator"], estimatedTime: "45 min – 1.5 hours" },
 
-            ch_fix_rectifier_urgent: { id: "ch_fix_rectifier_urgent", type: "resolution", severity: "CRITICAL", title: "Rectifier/Regulator OVERCHARGING", text: "Regulator failed — sending too much voltage to battery and electronics.", action: "DO NOT RUN ENGINE until replaced. Replace rectifier/regulator. Check battery for damage. Check ALL onboard electronics after repair — overvoltage may have damaged them.", warning: "Overcharging can destroy batteries, MFDs, radios, and other electronics.", partsNeeded: ["Rectifier/regulator", "Possibly new battery"], estimatedTime: "1-2 hours" },
+            ch_fix_rectifier_urgent: { id: "ch_fix_rectifier_urgent", type: "resolution", severity: "CRITICAL", title: "Regulator OVERCHARGING", text: "Regulator failed — sending too much voltage to battery and electronics.", action: "DO NOT RUN ENGINE until replaced. Yamaha: replace the rectifier/regulator. Mercury (belt-driven alternator): the regulator is inside the alternator and is not serviced separately — replace the alternator. Check battery for damage. Check ALL onboard electronics after repair — overvoltage may have damaged them.", warning: "Overcharging can destroy batteries, MFDs, radios, and other electronics.", partsNeeded: ["Rectifier/regulator (Yamaha) or alternator (Mercury)", "Possibly new battery"], estimatedTime: "1-2 hours" },
+
+            ch_fix_belt: { id: "ch_fix_belt", type: "resolution", severity: "LOW", title: "Alternator Belt Replacement / Tension (Mercury)", text: "Belt is slipping, glazed, cracked, or missing — the alternator cannot spin at speed.", action: "Replace the belt (do not just re-tension a glazed or cracked belt). Set tension per the Mercury service manual for the serial number. Check the alternator and idler pulleys spin freely and are aligned. Re-test: 13.8-14.8V at the battery at 1000+ RPM.", partsNeeded: ["Alternator belt (Mercury part for serial number)"], estimatedTime: "30-60 minutes" },
+
+            ch_fix_alternator: { id: "ch_fix_alternator", type: "resolution", severity: "MEDIUM", title: "Alternator Replacement (Mercury)", text: "Belt, excite wire, and ground are good but the alternator is not producing output — the alternator (or its internal regulator) has failed.", action: "Replace the alternator. The regulator is internal and is not serviced separately — there is no stand-alone rectifier/regulator on these engines and no flywheel removal is needed. Inspect the B+ cable and connector for heat damage. Re-test: 13.8-14.8V at the battery at 1000+ RPM.", partsNeeded: ["Alternator (Mercury part for serial number)", "Alternator belt (replace while apart)"], estimatedTime: "1-2 hours" },
 
             ch_fix_breaker: { id: "ch_fix_breaker", type: "resolution", severity: "MEDIUM", title: "Main Breaker Tripped", text: "Main circuit breaker tripped or main fuse blown.", action: "Reset breaker or replace fuse. If it trips again immediately, there is a SHORT CIRCUIT. Disconnect all circuits and reconnect one at a time to find the short.", partsNeeded: ["Replacement fuse if applicable"], estimatedTime: "15-60 minutes" },
 
@@ -1211,7 +1277,7 @@ window.defined_trees = {
 
             fix_battery: { id: "fix_battery", type: "resolution", severity: "MEDIUM", title: "Battery Replacement", text: "Battery has failed or is too weak.", action: "Replace battery. Clean terminals. Apply dielectric grease. TEST CHARGING SYSTEM after — should read 13.8-14.8V at 1000+ RPM. Make sure a bad alternator didn't kill this battery.", partsNeeded: ["Marine cranking battery (match group size)", "Terminal protectors", "Dielectric grease"], estimatedTime: "30-45 minutes" },
 
-            parasitic_draw: { id: "parasitic_draw", type: "resolution", severity: "MEDIUM", title: "Parasitic Draw Test", text: "Something is drawing the battery down with the key off.", action: "With everything off and battery rested, put a clamp ammeter on the negative cable. Reading should be under ~50 mA. If higher, pull fuses one at a time to find the offending circuit. Common offenders: stereo memory, GPS/MFD, bilge auto switch, dock-side phantom load.", partsNeeded: [], estimatedTime: "1-2 hours" },
+            fix_maintainer: { id: "fix_maintainer", type: "resolution", severity: "LOW", title: "Battery Maintainer Recommended", text: "Battery drains from sitting between uses.", action: "Install onboard battery maintainer. Good brands: ProMariner, Guest, NOCO.", partsNeeded: ["Onboard battery maintainer"], estimatedTime: "30-60 min to install" },
 
             fix_wiring: { id: "fix_wiring", type: "resolution", severity: "MEDIUM", title: "Wiring Repair", text: "Wiring is damaged, chafed, corroded, or shorted.", action: "Trace the affected circuit end-to-end. Repair or replace damaged sections with marine-grade tinned wire. Use heat-shrink butt connectors. Apply dielectric grease at any reopened connections. Re-secure runs with cushioned clamps away from heat and moving parts.", partsNeeded: ["Marine tinned wire (matching gauge)", "Heat-shrink butt connectors", "Dielectric grease"], estimatedTime: "1-3 hours" },
 
@@ -1679,7 +1745,8 @@ window.defined_trees = {
                 type: "instruction",
                 text: "Weak VHF reception. Same causes as transmit problems.",
                 options: [
-                    { label: "Check antenna system", next: "el_vhf_no_tx" }
+                    { label: "Check antenna system", next: "el_vhf_no_tx" },
+                    { label: "Antenna and cable checked OK — radio receiver failed", next: "el_fix_vhf_replace" }
                 ]
             },
 
@@ -3285,7 +3352,7 @@ window.defined_trees = {
                     { label: "Code 39 — oil pressure sensor", next: "code_39" },
                     { label: "Code 44 — stop lanyard switch", next: "code_44" },
                     { label: "Code 45 — shift cut switch", next: "code_45" },
-                    { label: "Code 46 — thermoswitch", next: "code_46" },
+                    { label: "Code 46 — thermoswitch (F150/F200)", next: "code_46" },
                     { label: "Code 49 or 59 (F115 only)", next: "code_115_only" },
                     { label: "No flash at all — indicator dark", next: "no_flash" }
                 ]
@@ -3368,7 +3435,7 @@ window.defined_trees = {
                     "Back-probe the TPS P (signal) wire with key ON, engine OFF",
                     "Verify 5V on O (reference) wire",
                     "Sweep throttle slowly — output should rise smoothly to ~4.5V with no dead spots",
-                    "If TPS was disassembled, loosen the two mounting screws and rotate TPS to hit spec voltage, then retorque"
+                    "If TPS was disassembled, loosen the two mounting screws and rotate the TPS to the idle-stop voltage in the service manual for YOUR engine (F115C: 0.732 ± 0.014 V; F150TR: 0.70 ± 0.02 V; F200 V6: use the 69J manual value), then retorque"
                 ],
                 options: [
                     { label: "Voltage erratic or flat — replace TPS", next: "fix_tps" },
@@ -3566,7 +3633,8 @@ window.defined_trees = {
                 text: "Thermoswitch is reporting an overheat. That's a mechanical cooling problem — follow the standard overheat tree.",
                 action: "Exit this tree and start the 'Engine Overheat' diagnostic. Quick checks: water pump tell-tale flow, raw-water intake clear, thermostat operation (F115 opens 48–52°C / F150/F200 58–62°C), impeller condition.",
                 partsNeeded: ["Water pump impeller kit", "Thermostat"],
-                estimatedTime: "1-3 hours"
+                estimatedTime: "1-3 hours",
+                jumpTo: { tree: "engine_overheat", label: "Open the Engine Overheat diagnostic" }
             },
 
             // ==== YAMAHA FLASH-CODE RESOLUTIONS ====
@@ -3574,9 +3642,9 @@ window.defined_trees = {
 
             fix_sensor: { id: "fix_sensor", type: "resolution", severity: "MEDIUM", title: "Replace Sensor", text: "Sensor is out of spec.", action: "Replace the affected sensor with the correct Yamaha part. Apply dielectric grease to the connector. Clear the code and confirm it doesn't return after a warm-up cycle.", partsNeeded: ["Replacement sensor", "Dielectric grease"], estimatedTime: "30-90 minutes" },
 
-            fix_tps: { id: "fix_tps", type: "resolution", severity: "MEDIUM", title: "TPS Replacement", text: "TPS signal is erratic or flat.", action: "Replace the throttle position sensor. Perform the TPS adjustment procedure — loosen the two mounting screws and rotate to hit the factory idle voltage (F115: 0.732V, F150: 0.70V), then retorque. Clear code and verify with YDS live data sweep.", partsNeeded: ["Throttle position sensor", "Dielectric grease"], estimatedTime: "1-2 hours" },
+            fix_tps: { id: "fix_tps", type: "resolution", severity: "MEDIUM", title: "TPS Replacement", text: "TPS signal is erratic or flat.", action: "Replace the throttle position sensor. Perform the TPS adjustment procedure — loosen the two mounting screws and rotate to hit the factory idle voltage from the service manual for YOUR engine (F115C: 0.732 ± 0.014 V; F150TR: 0.70 ± 0.02 V; F200 V6: use the 69J manual value), then retorque. Clear code and verify with YDS live data sweep.", partsNeeded: ["Throttle position sensor", "Dielectric grease"], estimatedTime: "1-2 hours" },
 
-            fix_tps_adjust: { id: "fix_tps_adjust", type: "resolution", severity: "LOW", title: "TPS Adjustment Procedure", text: "TPS signal was offset; rotation adjustment corrected it.", action: "Loosen the TPS mounting screws. Rotate the TPS body while watching signal voltage until it matches the factory idle-stop value. Retorque. Sweep throttle to verify linear rise. Clear code.", partsNeeded: [], estimatedTime: "15-45 minutes" },
+            fix_tps_adjust: { id: "fix_tps_adjust", type: "resolution", severity: "LOW", title: "TPS Adjustment Procedure", text: "TPS signal was offset; rotation adjustment corrected it.", action: "Loosen the TPS mounting screws. Rotate the TPS body while watching signal voltage until it matches the factory idle-stop value from the service manual for YOUR engine (F115C: 0.732 ± 0.014 V; F150TR: 0.70 ± 0.02 V; F200 V6: use the 69J manual value). Retorque. Sweep throttle to verify linear rise. Clear code.", partsNeeded: [], estimatedTime: "15-45 minutes" },
 
             fix_regulator: { id: "fix_regulator", type: "resolution", severity: "MEDIUM", title: "Rectifier / Regulator Replacement", text: "Charging output too low.", action: "Replace the rectifier/regulator. Verify stator/lighting coil output first (F115 lighting coil open-circuit peak: 37V @1500, 89V @3500 rpm) — regulators often die because a failing stator overheated them. Re-test charging voltage after swap.", partsNeeded: ["Rectifier/regulator", "Heat-sink compound"], estimatedTime: "1-2 hours" },
 
