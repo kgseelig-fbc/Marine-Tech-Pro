@@ -34,7 +34,7 @@ The suites need no API key or network: the Ask-a-Tech tests point the real `/api
 
 ## Deploy on Railway
 
-1. **Create a service from this repo.** Railway detects `npm start`; `package.json` pins Node `>=20 <25`.
+1. **Create a service from this repo.** Railway detects `npm start`; `package.json` pins Node `>=20 <25`. Leave the start command at `npm start` (or `node server.js`): the start script is `exec node server.js`, and the `exec` is what lets Railway's SIGTERM reach the server — npm runs scripts through `sh -c`, and without `exec` the signal stops at that shell, the server never drains, and the previous deployment's log ends in `npm error signal SIGTERM … command failed` on every push.
 2. **Mount a persistent volume at `/data`.** The SQLite database, session store and generated secrets all live under `DATA_DIR`, which defaults to `/data` when that directory exists. Without a volume every deploy wipes users, sessions and feedback.
 3. **Set the environment variables** listed below. The minimum for a working production instance is `BASE_URL`, `ANTHROPIC_API_KEY`, and either the Google pair plus `INITIAL_ADMIN_EMAILS` or `ADMIN_CODE`.
 4. **Give the old deployment time to drain.** Railway's default is to SIGKILL the previous deployment 0 seconds after SIGTERM, which makes the app's graceful shutdown a no-op and cuts any in-flight Ask-a-Tech call on every push. Set `RAILWAY_DEPLOYMENT_DRAINING_SECONDS=30` on the service (or `deploy.drainingSeconds` in a `railway.json`); `DRAIN_TIMEOUT_MS` (default 25000) must stay below that window.

@@ -1077,6 +1077,10 @@ const server = app.listen(PORT, () => {
 // Graceful shutdown: Railway sends SIGTERM on every redeploy. Drain in-flight
 // requests (an /api/ask call can run tens of seconds) and close SQLite so the
 // WAL is checkpointed instead of left for recovery on next boot.
+// The signal reaches this process only because package.json starts it with
+// `exec node server.js`: npm runs scripts through `sh -c`, and without the
+// exec the SIGTERM stops at that shell, node is orphaned and SIGKILLed with
+// the container, and none of this runs (test/server-lifecycle.test.js).
 // Must sit inside the platform's SIGKILL grace window — which on Railway is
 // 0 s unless the service sets RAILWAY_DEPLOYMENT_DRAINING_SECONDS (or
 // deploy.drainingSeconds in railway.json); see README. Note the AI client's
