@@ -110,7 +110,6 @@
             border-radius: 12px;
             box-shadow: 0 2px 6px rgba(0,0,0,0.06);
             border: 1px solid #eee;
-            cursor: pointer;
             transition: border-color 0.2s;
         }
 
@@ -122,10 +121,35 @@
             border-color: #1a3a5c;
         }
 
+        /* The header is a real <button>: only it toggles the card, so the
+           expanded causes/steps stay selectable text and real lists for
+           screen readers instead of children of one giant role=button. */
         .fault-header {
             display: flex;
             align-items: center;
             gap: 12px;
+            width: 100%;
+            min-height: 44px;
+            margin: 0;
+            padding: 0;
+            background: none;
+            border: 0;
+            text-align: left;
+            font: inherit;
+            color: inherit;
+            cursor: pointer;
+            -webkit-appearance: none;
+            appearance: none;
+        }
+
+        /* Code badge + severity badge stacked, so triage severity is visible
+           in the collapsed list. */
+        .fault-badges {
+            display: flex;
+            flex-direction: column;
+            align-items: flex-start;
+            gap: 5px;
+            flex-shrink: 0;
         }
 
         .fault-code-badge {
@@ -147,7 +171,9 @@
             flex: 1;
         }
 
+        /* <span>s (a <button> allows only phrasing content), laid out as blocks. */
         .fault-title {
+            display: block;
             font-size: 15px;
             font-weight: 700;
             color: #2c3e50;
@@ -155,6 +181,7 @@
         }
 
         .fault-brand {
+            display: block;
             font-size: 12px;
             color: #667883;
             margin-top: 2px;
@@ -172,15 +199,14 @@
         }
 
         .fault-details {
-            display: none;
             margin-top: 14px;
             padding-top: 14px;
             border-top: 1px solid #eee;
         }
 
-        .fault-card.expanded .fault-details {
-            display: block;
-        }
+        /* Visibility is the `hidden` attribute (toggled with aria-expanded);
+           an author display rule here would override it. */
+        .fault-details[hidden] { display: none; }
 
         .detail-section {
             margin-bottom: 12px;
@@ -211,9 +237,10 @@
             letter-spacing: 0.5px;
         }
 
-        .severity-badge.warning { background: #fef3e2; color: #b8860b; }
+        .severity-badge.warning { background: #fef3e2; color: #8a5a00; } /* was #b8860b (~3:1 at 11px) */
         .severity-badge.alarm { background: #fde8e8; color: #c0392b; }
         .severity-badge.shutdown { background: #e74c3c; color: #fff; }
+        .severity-badge.info { background: #eef1f4; color: #3d4b5c; }
 
         .cause-list, .fix-list {
             margin: 0;
@@ -288,27 +315,28 @@
 
     <!-- SEARCH -->
     <div class="search-container">
-        <span class="search-icon">&#128269;</span>
-        <input type="text" class="search-input" id="searchInput" placeholder="Search code, keyword, or symptom..." autocomplete="off">
-        <button class="search-clear" id="searchClear" onclick="clearSearch()">&#10005;</button>
+        <span class="search-icon" aria-hidden="true">&#128269;</span>
+        <input type="text" class="search-input" id="searchInput" placeholder="Search code, keyword, or symptom..." aria-label="Search fault codes" autocomplete="off">
+        <button type="button" class="search-clear" id="searchClear" aria-label="Clear search" onclick="clearSearch()"><span aria-hidden="true">&#10005;</span></button>
     </div>
 
     <!-- BRAND FILTER -->
-    <div class="filter-row">
-        <button class="filter-btn active" id="filterAll" onclick="setFilter('all')">All Codes</button>
-        <button class="filter-btn" id="filterMercury" onclick="setFilter('mercury')">Mercury</button>
-        <button class="filter-btn" id="filterYamaha" onclick="setFilter('yamaha')">Yamaha</button>
+    <div class="filter-row" role="group" aria-label="Brand">
+        <button type="button" class="filter-btn active" id="filterAll" aria-pressed="true" onclick="setFilter('all')">All Codes</button>
+        <button type="button" class="filter-btn" id="filterMercury" aria-pressed="false" onclick="setFilter('mercury')">Mercury</button>
+        <button type="button" class="filter-btn" id="filterYamaha" aria-pressed="false" onclick="setFilter('yamaha')">Yamaha</button>
     </div>
 
     <!-- SEVERITY FILTER -->
-    <div class="severity-filter-row">
-        <button class="sev-filter active" onclick="setSeverity('all', this)">All Severity</button>
-        <button class="sev-filter" onclick="setSeverity('Shutdown', this)">&#128308; Shutdown</button>
-        <button class="sev-filter" onclick="setSeverity('Alarm', this)">&#128992; Alarm</button>
-        <button class="sev-filter" onclick="setSeverity('Warning', this)">&#128993; Warning</button>
+    <div class="severity-filter-row" role="group" aria-label="Severity">
+        <button type="button" class="sev-filter active" aria-pressed="true" onclick="setSeverity('all', this)">All Severity</button>
+        <button type="button" class="sev-filter" aria-pressed="false" onclick="setSeverity('Shutdown', this)"><span aria-hidden="true">&#128308;</span> Shutdown</button>
+        <button type="button" class="sev-filter" aria-pressed="false" onclick="setSeverity('Alarm', this)"><span aria-hidden="true">&#128992;</span> Alarm</button>
+        <button type="button" class="sev-filter" aria-pressed="false" onclick="setSeverity('Warning', this)"><span aria-hidden="true">&#128993;</span> Warning</button>
+        <button type="button" class="sev-filter" aria-pressed="false" onclick="setSeverity('Info', this)"><span aria-hidden="true">&#8505;&#65039;</span> Info</button>
     </div>
 
-    <div class="results-count" id="resultsCount"></div>
+    <div class="results-count" id="resultsCount" aria-live="polite"></div>
 
     <!-- RESULTS -->
     <div id="faultResults"></div>
@@ -326,6 +354,9 @@
     // =============================================
 
     var faultCodes = window.faultCodeDatabase || [];
+    // Missing data (offline before the precache finished, expired session
+    // 302, script error) must not read as "this code isn't in the database".
+    if (!window.faultCodeDatabase) document.getElementById('searchInput').disabled = true;
 
     var currentFilter = 'all';
     var currentSeverity = 'all';
@@ -345,32 +376,40 @@
         renderResults();
     }
 
+    // Selected state is colour AND aria-pressed, so assistive tech can tell
+    // which filter is active.
     function setFilter(brand) {
         currentFilter = brand;
-        document.querySelectorAll('.filter-btn').forEach(function(btn) { btn.className = 'filter-btn'; });
-        document.getElementById('filter' + brand.charAt(0).toUpperCase() + brand.slice(1)).className = 'filter-btn active';
+        var activeId = 'filter' + brand.charAt(0).toUpperCase() + brand.slice(1);
+        document.querySelectorAll('.filter-btn').forEach(function(btn) {
+            var on = btn.id === activeId;
+            btn.className = on ? 'filter-btn active' : 'filter-btn';
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
         renderResults();
     }
 
     function setSeverity(sev, clicked) {
         currentSeverity = sev;
-        document.querySelectorAll('.sev-filter').forEach(function(btn) { btn.className = 'sev-filter'; });
-        clicked.className = 'sev-filter active';
+        document.querySelectorAll('.sev-filter').forEach(function(btn) {
+            var on = btn === clicked;
+            btn.className = on ? 'sev-filter active' : 'sev-filter';
+            btn.setAttribute('aria-pressed', on ? 'true' : 'false');
+        });
         renderResults();
     }
 
+    // The header button owns aria-expanded/aria-controls; the details panel
+    // is a sibling toggled with the hidden attribute. The card keeps the
+    // .expanded class for the chevron rotation.
     function toggleCard(id) {
         var card = document.getElementById(id);
+        if (!card) return;
+        var btn = card.querySelector('.fault-toggle');
+        var details = card.querySelector('.fault-details');
         var open = card.classList.toggle('expanded');
-        card.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-
-    // Cards are role="button" — Enter and Space must activate them.
-    function cardKey(e, id) {
-        if (e.key === 'Enter' || e.key === ' ' || e.key === 'Spacebar') {
-            e.preventDefault();
-            toggleCard(id);
-        }
+        if (btn) btn.setAttribute('aria-expanded', open ? 'true' : 'false');
+        if (details) details.hidden = !open;
     }
 
     var _faultSearchTimer = null;
@@ -378,6 +417,18 @@
     function mtpBeacon(kind, data) { if (window.MTP) MTP.beacon(kind, data); }
 
     function renderResults() {
+        if (!window.faultCodeDatabase) {
+            // Explicit failure state — filter taps must not overwrite it with "No codes found".
+            document.getElementById('resultsCount').textContent = '';
+            document.getElementById('faultResults').innerHTML =
+                '<div class="no-results">' +
+                '<div class="no-results-icon" aria-hidden="true">&#9888;&#65039;</div>' +
+                '<div class="no-results-text">Fault code data did not load.</div>' +
+                '<div class="no-results-hint">Reconnect and refresh.</div>' +
+                '</div>';
+            return;
+        }
+
         var query = document.getElementById('searchInput').value.trim().toLowerCase();
         var clearBtn = document.getElementById('searchClear');
         clearBtn.style.display = query ? 'flex' : 'none';
@@ -411,7 +462,7 @@
             return;
         }
 
-        var sevOrder = { Shutdown: 0, Alarm: 1, Warning: 2 };
+        var sevOrder = { Shutdown: 0, Alarm: 1, Warning: 2, Info: 3 };
         filtered.sort(function(a, b) {
             return (sevOrder[a.severity] !== undefined ? sevOrder[a.severity] : 9)
                  - (sevOrder[b.severity] !== undefined ? sevOrder[b.severity] : 9);
@@ -425,23 +476,29 @@
             var causes = (fc.causes || '').split('|').filter(Boolean);
             var steps = (fc.steps || '').split('|').filter(Boolean);
 
-            html += '<div class="fault-card" id="' + cardId + '" role="button" tabindex="0"'
-                  + ' aria-expanded="false" onclick="toggleCard(\'' + cardId + '\')"'
-                  + ' onkeydown="cardKey(event, \'' + cardId + '\')">';
-            html += '<div class="fault-header">';
+            var detailsId = 'fcd_' + i;
+            // Two distinct Yamaha numbering series share numbers (YAM-19 is a
+            // TPS fault, YAM-F-19 is battery voltage) — say which one this is.
+            var brandLabel = esc(fc.manufacturer);
+            var code = fc.code || '';
+            if (code.indexOf('YAM-F-') === 0) brandLabel = 'Yamaha &middot; on-engine flash code';
+            else if (code.indexOf('YAM-') === 0) brandLabel = 'Yamaha &middot; YDS / Command Link code';
+
+            html += '<div class="fault-card" id="' + cardId + '">';
+            html += '<button type="button" class="fault-header fault-toggle" aria-expanded="false"'
+                  + ' aria-controls="' + detailsId + '" onclick="toggleCard(\'' + cardId + '\')">';
+            html += '<span class="fault-badges">';
             html += '<span class="fault-code-badge ' + esc(brand) + '">' + esc(fc.code) + '</span>';
-            html += '<div class="fault-summary">';
-            html += '<div class="fault-title">' + esc(fc.description) + '</div>';
-            html += '<div class="fault-brand">' + esc(fc.manufacturer) + (fc.system ? ' &middot; ' + esc(fc.system) : '') + '</div>';
-            html += '</div>';
-            html += '<span class="fault-expand-icon">&#8250;</span>';
-            html += '</div>';
-
-            html += '<div class="fault-details">';
-
-            html += '<div class="detail-section">';
             html += '<span class="severity-badge ' + esc((fc.severity || '').toLowerCase()) + '">' + esc(fc.severity) + '</span>';
-            html += '</div>';
+            html += '</span>';
+            html += '<span class="fault-summary">';
+            html += '<span class="fault-title">' + esc(fc.description) + '</span>';
+            html += '<span class="fault-brand">' + brandLabel + (fc.system ? ' &middot; ' + esc(fc.system) : '') + '</span>';
+            html += '</span>';
+            html += '<span class="fault-expand-icon" aria-hidden="true">&#8250;</span>';
+            html += '</button>';
+
+            html += '<div class="fault-details" id="' + detailsId + '" hidden>';
 
             html += '<div class="detail-section">';
             html += '<div class="detail-label">Common Causes</div>';

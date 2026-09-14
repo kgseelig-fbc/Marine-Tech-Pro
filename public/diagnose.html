@@ -169,6 +169,7 @@
             font-size: 15px;
             border-bottom: 1px solid #eee;
             line-height: 1.5;
+            cursor: pointer;
         }
 
         .diag-checklist-item:last-child { border-bottom: none; }
@@ -187,7 +188,7 @@
             gap: 4px;
             margin: 12px 16px 0;
             font-size: 12px;
-            color: #95a5a6;
+            color: #3d4b5c; /* was #95a5a6 (~2.6:1) — unreadable on a sunlit dock */
         }
 
         .diag-breadcrumb span {
@@ -249,7 +250,7 @@
         }
 
         .resolution-severity.sev-low { background: #e6f4ea; color: #1e7e34; }
-        .resolution-severity.sev-medium { background: #fef3e2; color: #b8860b; }
+        .resolution-severity.sev-medium { background: #fef3e2; color: #8a5a00; } /* was #b8860b (~3:1 at 12px) */
         .resolution-severity.sev-high { background: #fde8e8; color: #c0392b; }
         .resolution-severity.sev-critical { background: #e74c3c; color: #fff; }
 
@@ -273,7 +274,7 @@
         .options-label {
             font-size: 13px;
             font-weight: 700;
-            color: #95a5a6;
+            color: #3d4b5c; /* was #95a5a6 (~2.6:1) */
             text-transform: uppercase;
             letter-spacing: 1px;
             margin-top: 20px;
@@ -299,6 +300,15 @@
         }
         .diag-ai-explain:active { background: #dbe6ff; border-color: #b4c7ff; }
         .diag-ai-explain .icon { color: #2980b9; }
+
+        /* Clear the Ask/Feedback FABs (~150×80px, bottom-right) so the last
+           option or the Back row is never covered when scrolled to the end. */
+        #diagnosticArea { padding-bottom: 120px; }
+
+        /* Step headings receive programmatic focus after each render (so
+           screen readers announce the step); they are not interactive, so
+           no focus ring. */
+        .diag-question:focus, .diag-instruction:focus, .resolution-title:focus { outline: none; }
     </style>
 </head>
 <body>
@@ -466,6 +476,13 @@
     var currentTree = null;
     var currentNodeId = null;
     var navHistory = [];
+    // Resolution nodes already beaconed in this run ("tree/node" keys), so
+    // backing into the same resolution doesn't count as a second resolve.
+    var resolvedThisRun = {};
+    // Number of history entries this document has pushed above its first one.
+    // goBack() only walks the browser history when there is an entry of ours
+    // to land on; a page restored after a reload starts at 0.
+    var histDepth = 0;
 
     function beginTree(treeName) {
         if (!window.defined_trees) {
@@ -479,29 +496,81 @@
         currentTree = window.defined_trees[treeName];
         currentNodeId = currentTree.startNode;
         navHistory = [];
+        resolvedThisRun = {};
         window.__currentDiagTree = treeName;
         window.__currentDiagNode = currentNodeId;
         document.getElementById('symptomPicker').style.display = 'none';
         document.getElementById('diagnosticArea').style.display = 'block';
         mtpBeacon('tree_start', { tree: treeName });
+        pushDiagState(diagState());
         renderCurrentNode();
+        // The picker is 13 cards tall: a tree started from the bottom of it
+        // would otherwise open scrolled past its first question.
+        window.scrollTo(0, 0);
     }
 
     // Shared implementation lives in js/common.js (MTP.beacon).
     function mtpBeacon(kind, data) { if (window.MTP) MTP.beacon(kind, data); }
 
+    // --- Browser history mirrors tree navigation ------------------------
+    // On a phone the natural "go back one step" is the hardware Back button
+    // or an iOS edge-swipe. Without entries of our own that gesture unloads
+    // the page and throws away a ten-step diagnosis. Every entry carries
+    // enough to rebuild the view; popstate restores it (or shows the picker).
+
+    function diagState() {
+        return { tree: window.__currentDiagTree, node: currentNodeId, hist: navHistory.slice() };
+    }
+
+    function pushDiagState(state) {
+        histDepth += 1;
+        state.depth = histDepth;
+        try { history.pushState(state, ''); } catch (_) {}
+    }
+
+    function replaceDiagState(state) {
+        state.depth = histDepth;
+        try { history.replaceState(state, ''); } catch (_) {}
+    }
+
+    function restoreDiagState(s) {
+        if (!s || !s.tree || !window.defined_trees || !window.defined_trees[s.tree]) return false;
+        currentTree = window.defined_trees[s.tree];
+        currentNodeId = s.node || currentTree.startNode;
+        navHistory = (s.hist || []).slice();
+        window.__currentDiagTree = s.tree;
+        window.__currentDiagNode = currentNodeId;
+        document.getElementById('symptomPicker').style.display = 'none';
+        document.getElementById('diagnosticArea').style.display = 'block';
+        renderCurrentNode();
+        window.scrollTo(0, 0);
+        return true;
+    }
+
+    window.addEventListener('popstate', function (e) {
+        histDepth = (e.state && typeof e.state.depth === 'number') ? e.state.depth : 0;
+        if (!restoreDiagState(e.state)) startOver(true);
+    });
+
     function goToNode(nodeId) {
         navHistory.push(currentNodeId);
         currentNodeId = nodeId;
         window.__currentDiagNode = currentNodeId;
+        pushDiagState(diagState());
         renderCurrentNode();
         window.scrollTo(0, 0);
     }
 
     function goBack() {
+        // Walk the browser history whenever we can, so the in-card Back and
+        // the hardware Back are one code path (popstate does the restore).
+        if (histDepth > 0) { history.back(); return; }
+        // A document restored after a reload has nothing of ours beneath it:
+        // step back in memory and keep the current entry in sync.
         if (navHistory.length > 0) {
             currentNodeId = navHistory.pop();
             window.__currentDiagNode = currentNodeId;
+            replaceDiagState(diagState());
             renderCurrentNode();
             window.scrollTo(0, 0);
         } else {
@@ -509,15 +578,28 @@
         }
     }
 
-    function startOver() {
+    function startOver(fromHistory) {
         currentTree = null;
         currentNodeId = null;
         navHistory = [];
+        resolvedThisRun = {};
         window.__currentDiagTree = null;
         window.__currentDiagNode = null;
         document.getElementById('symptomPicker').style.display = 'block';
         document.getElementById('diagnosticArea').style.display = 'none';
+        // A popstate has already moved the history pointer; a tap on
+        // "New Diagnosis" adds a picker entry so Back from it undoes the tap.
+        if (!fromHistory) pushDiagState({ picker: true });
         window.scrollTo(0, 0);
+    }
+
+    // After each render move focus to the step heading so screen readers
+    // announce the new step and keyboard focus doesn't silently drop to
+    // <body> when the button that was pressed is destroyed.
+    function focusHeading() {
+        var h = document.querySelector('#treeContent [role="heading"]');
+        if (!h) return;
+        try { h.focus({ preventScroll: true }); } catch (_) { h.focus(); }
     }
 
     function renderCurrentNode() {
@@ -544,20 +626,24 @@
         document.getElementById('breadcrumb').innerHTML = bcHtml;
 
         if (node.type === 'resolution') {
-            mtpBeacon('tree_resolve', {
-                tree: window.__currentDiagTree,
-                node: currentNodeId,
-                severity: node.severity || null,
-                title: node.title || null
-            });
+            var resolveKey = window.__currentDiagTree + '/' + currentNodeId;
+            if (!resolvedThisRun[resolveKey]) {
+                resolvedThisRun[resolveKey] = true;
+                mtpBeacon('tree_resolve', {
+                    tree: window.__currentDiagTree,
+                    node: currentNodeId,
+                    severity: node.severity || null,
+                    title: node.title || null
+                });
+            }
             renderResolution(node); return;
         }
 
         var html = '<div class="diag-card">';
         if (node.type === 'question') {
-            html += '<div class="diag-question">' + node.text + '</div>';
+            html += '<div class="diag-question" role="heading" aria-level="2" tabindex="-1">' + node.text + '</div>';
         } else {
-            html += '<div class="diag-instruction">' + node.text + '</div>';
+            html += '<div class="diag-instruction" role="heading" aria-level="2" tabindex="-1">' + node.text + '</div>';
         }
         if (node.warning) html += '<div class="diag-warning">' + node.warning + '</div>';
         if (node.help) html += '<div class="diag-help">' + node.help + '</div>';
@@ -570,7 +656,8 @@
         if (node.checklist && node.checklist.length > 0) {
             html += '<div class="diag-checklist">';
             for (var c = 0; c < node.checklist.length; c++) {
-                html += '<div class="diag-checklist-item"><input type="checkbox" class="diag-check"><span>' + node.checklist[c] + '</span></div>';
+                // <label> so the whole ~44px row toggles the box and the text is its accessible name.
+                html += '<label class="diag-checklist-item"><input type="checkbox" class="diag-check"><span>' + node.checklist[c] + '</span></label>';
             }
             html += '</div>';
         }
@@ -591,18 +678,19 @@
         if (navHistory.length === 0 && currentTree.requiredTools) {
             html += '<div class="tool-checklist"><div class="tool-checklist-title">Tools Needed for This Diagnosis</div>';
             for (var t = 0; t < currentTree.requiredTools.length; t++) {
-                html += '<div class="tool-item">&#128295; ' + currentTree.requiredTools[t] + '</div>';
+                html += '<div class="tool-item"><span aria-hidden="true">&#128295;</span> ' + currentTree.requiredTools[t] + '</div>';
             }
             html += '</div>';
         }
         document.getElementById('treeContent').innerHTML = html;
+        focusHeading();
     }
 
     function renderResolution(node) {
         var sevClass = 'severity-' + (node.severity || 'low').toLowerCase();
         var sevLabel = 'sev-' + (node.severity || 'low').toLowerCase();
         var html = '<div class="resolution-card ' + sevClass + '">';
-        html += '<div class="resolution-title">' + (node.title || 'Resolution') + '</div>';
+        html += '<div class="resolution-title" role="heading" aria-level="2" tabindex="-1">' + (node.title || 'Resolution') + '</div>';
         html += '<span class="resolution-severity ' + sevLabel + '">' + (node.severity || 'INFO') + '</span>';
         html += '<div class="resolution-text">' + node.text + '</div>';
         if (node.warning) html += '<div class="diag-warning">' + node.warning + '</div>';
@@ -630,11 +718,26 @@
               + 'Why this fix?'
               + '</button>';
         html += '</div>';
+        // Cross-tree / cross-page hand-off ("go to the Overheat tree"): a real
+        // button instead of prose telling the tech to find the card themselves.
+        // jumpTo.tree starts that tree in place; jumpTo.href leaves the page.
+        if (node.jumpTo && (node.jumpTo.tree || node.jumpTo.href)) {
+            var jump = node.jumpTo;
+            var jumpLabel = jump.label
+                || (jump.tree && window.defined_trees[jump.tree] ? 'Open the ' + window.defined_trees[jump.tree].title + ' diagnostic' : 'Open link');
+            var jumpClick = jump.tree
+                ? 'beginTree(\'' + jump.tree + '\')'
+                : 'location.assign(\'' + jump.href + '\')';
+            html += '<div style="margin-top:16px;">';
+            html += '<button class="resolution-start-over" type="button" onclick="' + jumpClick + '">' + jumpLabel + ' &#8250;</button>';
+            html += '</div>';
+        }
         html += '<div style="margin-top:12px;">';
         html += '<button class="diag-back-btn" onclick="goBack()" style="margin-right:10px;">&#8592; Back</button>';
         html += '<button class="resolution-start-over" onclick="startOver()">New Diagnosis</button>';
         html += '</div></div>';
         document.getElementById('treeContent').innerHTML = html;
+        focusHeading();
     }
 
     function explainStep() {
@@ -660,6 +763,18 @@
         }
         window.askTech(q);
     }
+
+    (function () {
+        // A reload, or a return to this page via Back, lands on an entry that
+        // may already hold tree state — resume there instead of dropping the
+        // tech on the picker. Otherwise mark this entry as the picker so a
+        // later popstate to it is recognised.
+        var s = null;
+        try { s = history.state; } catch (_) {}
+        histDepth = 0;
+        if (restoreDiagState(s)) replaceDiagState(diagState());
+        else replaceDiagState({ picker: true });
+    })();
 
     </script>
     <script src="/js/common.js"></script>

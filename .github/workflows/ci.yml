@@ -18,15 +18,15 @@ jobs:
 
       - run: npm ci
 
-      # Syntax check every server-side file.
-      - name: Syntax check
-        run: node --check server.js && node --check lib/db.js && node --check lib/auth.js
-
-      # Validates the hand-maintained diagnostic trees, fault codes and specs:
-      # broken node references and dead ends are otherwise invisible until a
-      # technician hits one in the field.
-      - name: Validate domain data
-        run: npm run validate
+      # `npm run check` syntax-checks every shipped JS file (server, lib/,
+      # scripts/, public/js/ and the service worker — a stray character in
+      # common.js breaks sign-out on every page and no test would load it),
+      # then validates the hand-maintained diagnostic trees, fault codes and
+      # specs: broken node references and dead ends are otherwise invisible
+      # until a technician hits one in the field. One script, so this list and
+      # package.json cannot drift apart.
+      - name: Syntax check + validate domain data
+        run: npm run check
 
       - name: Tests
         run: node --test test/*.test.js

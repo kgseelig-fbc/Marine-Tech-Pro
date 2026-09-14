@@ -50,7 +50,7 @@
     </header>
     <main>
         <h1>Privacy Policy</h1>
-        <p class="updated">Last updated: April 22, 2026</p>
+        <p class="updated">Last updated: September 14, 2026</p>
 
         <p>This Privacy Policy explains how the internal tools operated for Freedom Boat Club ("we," "us," or "our") collect, use, and protect information when authorized users access our applications, including but not limited to Marine Tech Pro and related internal tooling (collectively, the "Services").</p>
 
@@ -62,6 +62,8 @@
             <li><strong>Account information.</strong> When you sign in with Google, we receive your name, email address, and Google account ID. When you sign up with email and password, we store your email, a name you provide, and a hashed password.</li>
             <li><strong>Usage data.</strong> We record which tools you use, which diagnostic flows or features you access, and basic session metadata (IP address, browser user-agent, timestamps). This is used for operational monitoring and for administrator dashboards.</li>
             <li><strong>AI assistant interactions.</strong> When you use an in-app AI feature (e.g., "Ask a Tech"), the text of your question and any contextual information (such as which diagnostic step you are on) is sent to a third-party AI provider (Anthropic) to generate a response. The question, response, and token usage are logged for quality and rate-limiting purposes.</li>
+            <li><strong>Voice input and read-aloud.</strong> If you tap the microphone in the AI assistant, your device's or browser's built-in speech recognition service converts your speech to text. That audio may be processed by your browser vendor (e.g., Apple or Google) under its own privacy policy; we never receive or store audio. Only the resulting text is handled as an AI-assistant question as described above. Reading an answer aloud uses your device's on-device speech synthesis and sends nothing to us.</li>
+            <li><strong>Feedback you submit.</strong> When you send a bug report, feedback, or enhancement request from inside the app, we store the category, your message, the page (and diagnostic step, if any) you were on, and your name and email so an administrator can follow up.</li>
             <li><strong>Cookies.</strong> We use a session cookie to keep you signed in. We do not use advertising or cross-site tracking cookies.</li>
         </ul>
 
@@ -82,11 +84,12 @@
             <li><strong>Hosting and infrastructure providers</strong> (e.g., Railway) that run the Services on our behalf.</li>
             <li><strong>Authentication providers</strong> (Google) when you choose to sign in with them.</li>
             <li><strong>AI providers</strong> (Anthropic) to process AI-assistant questions you submit.</li>
+            <li><strong>Browser speech-recognition providers</strong> (your browser vendor, e.g., Apple or Google) only when you choose to use voice input.</li>
             <li><strong>Authorities</strong> when legally required.</li>
         </ul>
 
         <h2>6. Retention</h2>
-        <p>We retain account records for as long as your access is active, and usage and AI logs for a reasonable operational period. You may request deletion of your account by contacting us.</p>
+        <p>We retain account records for as long as your access is active. Usage events and AI-assistant logs are deleted automatically after 90 days by default (the operator can configure this window). Feedback you submit is kept until it is resolved or deleted by an administrator. You may request deletion of your account by contacting us; deleting an account removes its usage events and AI logs and anonymises any feedback it submitted (your name and email are removed from it).</p>
 
         <h2>7. Security</h2>
         <p>Passwords are stored using industry-standard hashing (bcrypt). Traffic is served over HTTPS. Access is role-gated and new accounts must be approved by an administrator. No online service can be guaranteed to be 100% secure.</p>

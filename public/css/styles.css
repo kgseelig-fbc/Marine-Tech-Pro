@@ -773,6 +773,12 @@ a:focus-visible,
 #ask-fab {
     position: fixed;
     bottom: 20px; right: 20px;
+    /* App pages opt into viewport-fit=cover, so the layout runs under the
+       iOS home indicator: 20px put the FAB inside the system swipe zone
+       where taps are intercepted. Plain values first for browsers without
+       env(). */
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: calc(20px + env(safe-area-inset-right, 0px));
     width: 60px; height: 60px;
     border-radius: 50%;
     background: var(--grad-hero);
@@ -812,6 +818,8 @@ a:focus-visible,
     width: 100%; max-width: 600px;
     border-radius: var(--r-xl) var(--r-xl) 0 0;
     padding: 18px 16px 14px;
+    /* Bottom sheet: the send/mic row sits on the home indicator otherwise. */
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
     max-height: 85vh;
     display: flex; flex-direction: column;
     box-shadow: 0 -20px 50px rgba(0,0,0,.35);
@@ -826,6 +834,8 @@ a:focus-visible,
     background: none; border: none;
     color: var(--muted); cursor: pointer; padding: 4px;
     display: flex; align-items: center; justify-content: center;
+    /* Wet/gloved use: 44px target, icon stays small inside it. */
+    min-width: 44px; min-height: 44px;
 }
 #ask-close .icon { width: 22px; height: 22px; }
 
@@ -846,7 +856,9 @@ a:focus-visible,
     flex: 1; padding: 12px;
     border: 1.5px solid var(--hairline);
     border-radius: var(--r-md);
-    font-size: 15px; font-family: inherit;
+    /* 16px minimum: iOS Safari zooms the page when a focused control is
+       smaller, and the zoom outlives the sheet. */
+    font-size: 16px; font-family: inherit;
     resize: none; max-height: 100px;
     -webkit-appearance: none;
 }
@@ -879,6 +891,7 @@ a:focus-visible,
     color: var(--muted); cursor: pointer;
     padding: 4px; border-radius: var(--r-sm);
     display: flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px;
 }
 #ask-voice-settings:hover { color: var(--fbc-navy); background: var(--bg-2); }
 #ask-voice-settings .icon { width: 20px; height: 20px; }
@@ -902,8 +915,9 @@ a:focus-visible,
     border: 1px solid var(--hairline);
     border-radius: var(--r-sm);
     background: var(--surface);
-    font-size: 12.5px; font-family: inherit;
+    font-size: 16px; font-family: inherit; /* 16px: no iOS focus zoom */
     width: 100%;
+    min-height: 44px;
 }
 #ask-voice-panel input[type="range"] { width: 100%; }
 #ask-voice-panel #ask-voice-rate-val {
@@ -914,13 +928,14 @@ a:focus-visible,
     background: var(--fbc-navy); color: #fff; border: none;
     padding: 6px 14px; border-radius: var(--r-sm);
     font-size: 12.5px; font-weight: 600; cursor: pointer;
+    min-width: 44px; min-height: 44px;
 }
 
 #ask-speaking-bar {
     display: flex; justify-content: space-between; align-items: center;
     background: var(--info-soft);
     border-radius: var(--r-sm);
-    padding: 8px 12px;
+    padding: 4px 4px 4px 12px;
     margin-bottom: 8px;
     font-size: 12.5px; font-weight: 600;
     color: #174A93;
@@ -936,9 +951,10 @@ a:focus-visible,
 }
 #ask-stop-speak {
     background: var(--danger); color: #fff; border: none;
-    padding: 4px 12px; border-radius: var(--r-pill);
+    padding: 4px 16px; border-radius: var(--r-pill);
     font-size: 11.5px; font-weight: 700; cursor: pointer;
     letter-spacing: .04em; text-transform: uppercase;
+    min-width: 64px; min-height: 44px;
 }
 
 .ask-read-btn {
@@ -946,7 +962,8 @@ a:focus-visible,
     background: none;
     border: 1px solid var(--hairline);
     border-radius: var(--r-sm);
-    padding: 6px 10px;
+    padding: 6px 12px;
+    min-height: 44px;
     font-size: 12.5px; font-weight: 600;
     color: var(--fbc-navy);
     cursor: pointer;
@@ -955,11 +972,18 @@ a:focus-visible,
 }
 .ask-read-btn:hover { background: var(--bg-2); border-color: var(--muted-2); }
 .ask-read-btn .icon { color: var(--fbc-cyan); }
+.ask-truncated {
+    margin-top: 8px;
+    font-size: 12.5px; font-style: italic;
+    color: var(--muted);
+}
 
 /* --- FEEDBACK FLOATING WIDGET --- */
 #fb-fab {
     position: fixed;
     bottom: 20px; right: 92px;
+    bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+    right: calc(92px + env(safe-area-inset-right, 0px));
     width: 50px; height: 50px;
     border-radius: 50%;
     background: var(--surface);
@@ -988,6 +1012,7 @@ a:focus-visible,
     width: 100%; max-width: 520px;
     border-radius: var(--r-xl) var(--r-xl) 0 0;
     padding: 18px 18px 16px;
+    padding-bottom: calc(16px + env(safe-area-inset-bottom, 0px));
     max-height: 85vh;
     display: flex; flex-direction: column;
     box-shadow: 0 -20px 50px rgba(0,0,0,.35);
@@ -1004,6 +1029,8 @@ a:focus-visible,
 #fb-close {
     background: none; border: none;
     color: var(--muted); cursor: pointer; padding: 4px;
+    display: flex; align-items: center; justify-content: center;
+    min-width: 44px; min-height: 44px;
 }
 #fb-close .icon { width: 20px; height: 20px; }
 
@@ -1023,6 +1050,7 @@ a:focus-visible,
     font-size: 13px; font-weight: 600;
     cursor: pointer;
     font-family: inherit;
+    min-height: 44px;
 }
 .fb-cat:hover { background: var(--bg); }
 .fb-cat.active {
@@ -1035,7 +1063,7 @@ a:focus-visible,
     border: 1px solid var(--hairline);
     border-radius: var(--r-md);
     padding: 10px 12px;
-    font-size: 14.5px;
+    font-size: 16px; /* 16px minimum: no iOS focus zoom */
     font-family: inherit;
     color: var(--ink);
     resize: vertical;
@@ -1061,6 +1089,7 @@ a:focus-visible,
     font-size: 13.5px; font-weight: 700;
     cursor: pointer;
     font-family: inherit;
+    min-height: 44px;
 }
 .fb-btn:hover { background: var(--bg); }
 .fb-btn.primary {
@@ -1103,6 +1132,7 @@ a:focus-visible,
     cursor: pointer; font-family: inherit;
     border-bottom: 2px solid transparent;
     margin-bottom: -1px;
+    min-height: 44px;
 }
 .fb-tab:hover { color: var(--ink-2); }
 .fb-tab.active {
@@ -1178,7 +1208,7 @@ a:focus-visible,
     border: 1px solid var(--hairline);
     border-radius: var(--r-sm);
     padding: 6px 8px;
-    font-size: 13px;
+    font-size: 16px; /* 16px minimum: no iOS focus zoom */
     font-family: inherit;
     resize: vertical;
     min-height: 36px;
@@ -1192,11 +1222,37 @@ a:focus-visible,
     white-space: nowrap;
 }
 
+/* --- TOAST (MTP.toast in common.js) --- */
+/* Sits above the FAB row (60px + 20px offset); safe-area aware like them. */
+.mtp-toast {
+    position: fixed;
+    left: 50%; transform: translateX(-50%);
+    bottom: 96px;
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
+    max-width: calc(100% - 32px);
+    z-index: 10000;
+    display: flex; align-items: center; gap: 8px;
+    background: var(--fbc-navy); color: #fff;
+    padding: 10px 8px 10px 16px;
+    border-radius: var(--r-md);
+    box-shadow: var(--shadow-lg);
+    font-size: 14px; font-weight: 600; line-height: 1.4;
+}
+.mtp-toast button {
+    background: none; border: none; color: #fff; cursor: pointer;
+    min-width: 44px; min-height: 44px;
+    /* Negative margins keep the toast compact while the target stays 44px. */
+    margin: -10px -8px -10px 0;
+    font-size: 22px; line-height: 1;
+    display: flex; align-items: center; justify-content: center;
+    flex: none;
+}
+
 /* --- SMALL SCREENS --- */
 @media (max-width: 380px) {
     .home-header { padding: 28px 18px 54px; }
     .home-header h1 { font-size: 23px; }
     .menu-title { font-size: 15.5px; }
     .menu-subtitle { font-size: 12px; }
-    #fb-fab { right: 82px; width: 46px; height: 46px; }
+    #fb-fab { right: 82px; right: calc(82px + env(safe-area-inset-right, 0px)); width: 46px; height: 46px; }
 }

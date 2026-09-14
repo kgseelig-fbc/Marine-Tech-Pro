@@ -66,7 +66,7 @@
             + '      <label class="fb-label" for="fb-msg">Details</label>'
             + '      <textarea id="fb-msg" rows="5" placeholder="What happened, what you expected, or what would help…" maxlength="4000"></textarea>'
             + '      <div id="fb-meta"></div>'
-            + '      <div id="fb-status"></div>'
+            + '      <div id="fb-status" role="status" aria-live="polite"></div>'
             + '      <div id="fb-actions">'
             + '        <button type="button" id="fb-cancel" class="fb-btn">Cancel</button>'
             + '        <button type="button" id="fb-send" class="fb-btn primary">Send</button>'
@@ -102,6 +102,12 @@
         function open() {
             if (overlay.classList.contains('open')) return;
             overlay.classList.add('open');
+            // Start every open on a fresh Submit form. Carrying the last tab
+            // over showed "My reports" as fetched during the previous open
+            // (an admin reply since then was invisible), and carrying the
+            // category over filed the next report under the previous type.
+            setTab('submit');
+            setCategory('bug');
             statusEl.textContent = '';
             statusEl.className = '';
             updateMeta();
@@ -164,13 +170,16 @@
 
         sendBtn.addEventListener('click', submit);
 
+        var busy = false;
         function submit() {
+            if (busy) return; // Ctrl/Cmd+Enter bypasses the disabled button — don't double-post
             var msg = msgInput.value.trim();
             if (!msg || msg.length < 3) {
                 statusEl.textContent = 'Please add a short description.';
                 statusEl.className = 'err';
                 return;
             }
+            busy = true;
             sendBtn.disabled = true;
             statusEl.textContent = 'Sending…';
             statusEl.className = '';
@@ -196,6 +205,7 @@
                         .catch(function () { return { status: r.status, body: null }; });
                 })
                 .then(function (res) {
+                    busy = false;
                     sendBtn.disabled = false;
                     if (res.body && res.body.success) {
                         statusEl.textContent = 'Thanks — feedback received.';
@@ -214,6 +224,7 @@
                     }
                 })
                 .catch(function () {
+                    busy = false;
                     sendBtn.disabled = false;
                     statusEl.textContent = 'Network error. Try again.';
                     statusEl.className = 'err';

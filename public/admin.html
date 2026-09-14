@@ -165,7 +165,9 @@
             color: var(--ink-2);
             border: 1px solid var(--hairline);
             border-radius: var(--r-pill);
-            padding: 5px 12px;
+            /* Admins triage from the same phones techs use — keep tap targets ≥44px. */
+            min-height: 44px;
+            padding: 5px 14px;
             font-size: 12px;
             font-weight: 700;
             cursor: pointer;
@@ -186,6 +188,7 @@
             background: var(--surface);
             border: 1px solid var(--hairline);
             border-radius: var(--r-sm);
+            min-height: 36px;
             padding: 5px 8px;
             font-size: 12.5px;
             font-weight: 600;
@@ -198,7 +201,8 @@
             background: var(--bg-2);
             border: 1px solid var(--hairline);
             border-radius: var(--r-sm);
-            padding: 4px 10px;
+            min-height: 36px;
+            padding: 4px 12px;
             font-size: 11.5px;
             font-weight: 700;
             color: var(--ink-2);
@@ -211,6 +215,8 @@
         .btn-xs.primary:hover { background: #157a3e; }
         .btn-xs.danger  { background: transparent; color: var(--danger); border-color: var(--danger-soft); }
         .btn-xs.danger:hover { background: var(--danger-soft); }
+
+        .pill.cached { margin-left: 6px; }
 
         .pill.role-pending { background: var(--warn-soft);   color: #6B4A10; }
         .pill.role-tech    { background: var(--info-soft);   color: #174A93; }
@@ -465,6 +471,10 @@ function renderAi(rows) {
     tbody.innerHTML = rows.map(function(r){
         var ctx = r.ctx_tree ? esc(r.ctx_tree) + (r.ctx_node ? ' / ' + esc(r.ctx_node) : '') : '<span class="mono">—</span>';
         var tokens = (r.tokens_in || 0) + ' / ' + (r.tokens_out || 0);
+        // cache_read only exists on servers that record prompt-cache usage.
+        if (typeof r.cache_read === 'number' && r.cache_read > 0) {
+            tokens += '<span class="pill ai cached" title="' + r.cache_read + ' prompt tokens served from cache">cached</span>';
+        }
         return '<tr>'
              + '<td class="mono">' + fmtTime(r.ts) + '</td>'
              + '<td class="q-cell">' + esc(r.question) + '</td>'
@@ -514,12 +524,17 @@ function renderEvents(rows) {
 
 function renderStats(s) {
     var g = document.getElementById('statGrid');
+    // Older servers don't report cache tokens — treat absent as 0, show '—' for no traffic.
+    var reads  = typeof s.last24h.aiCacheReadTokens  === 'number' ? s.last24h.aiCacheReadTokens  : 0;
+    var writes = typeof s.last24h.aiCacheWriteTokens === 'number' ? s.last24h.aiCacheWriteTokens : 0;
+    var hitRate = (reads + writes) > 0 ? Math.round(reads / (reads + writes) * 100) + '%' : '\u2014';
     g.innerHTML =
           stat('Logins (24h)',       s.last24h.logins,       s.last24h.loginFail + ' failed',     'i-lock')
         + stat('Unique users (24h)', s.last24h.uniqueUsers,  s.last7d.uniqueUsers + ' past 7d',    'i-home')
         + stat('Diagnostics (24h)',  s.last24h.treeStarts,   s.last7d.treeStarts + ' past 7d',     'i-wrench')
         + stat('Fault lookups (24h)',s.last24h.faultLookups, '',                                   'i-alert')
         + stat('AI asks (24h)',      s.last24h.aiAsks,       s.last7d.aiAsks + ' past 7d',         'i-ai')
+        + stat('AI cache (24h)',     hitRate,                reads + ' read / ' + writes + ' written', 'i-ai')
         + stat('Total events',       s.total.events,         s.total.aiMessages + ' AI messages',  'i-gauge');
 }
 
@@ -527,6 +542,23 @@ function renderStats(s) {
 
 var userFilter = 'pending';
 var allUsers = [];
+
+// Our own user id, so demoting ourselves can leave the dashboard cleanly
+// instead of leaving the admin on a page whose every request now 403s.
+// Break-glass sessions have no id and stay null.
+var myUserId = null;
+fetch('/api/me')
+    .then(function(r){ return r.json(); })
+    .then(function(m){ if (m.authenticated && m.user && typeof m.user.id === 'number') myUserId = m.user.id; })
+    .catch(function(){});
+
+// True when the admin is interacting with a control inside the table (an open
+// role/status dropdown, a focused note) — re-rendering would close or blur it.
+function isEditing(tableId) {
+    var el = document.activeElement;
+    var table = document.getElementById(tableId);
+    return !!(el && table && el !== document.body && table.contains(el));
+}
 
 function setUserFilter(f) {
     userFilter = f;
@@ -588,7 +620,7 @@ function renderUsers(users) {
             actions = ''
                 + '<button class="btn-xs primary" onclick="approveUser(' + u.id + ', \'tech\')">Approve</button> '
                 + '<button class="btn-xs" onclick="approveUser(' + u.id + ', \'admin\')">Make admin</button> '
-                + '<button class="btn-xs danger" onclick="setRole(' + u.id + ', \'denied\')">Deny</button>';
+                + '<button class="btn-xs danger" onclick="denyUser(' + u.id + ')">Deny</button>';
         } else {
             actions = '<button class="btn-xs danger" onclick="deleteUser(' + u.id + ')">Delete</button>';
         }
@@ -610,6 +642,11 @@ function renderUsers(users) {
 
 function approveUser(id, role) { setRole(id, role); }
 
+function denyUser(id) {
+    if (!confirm('Deny this sign-up? They will not be able to use the app until an admin changes their role.')) return;
+    setRole(id, 'denied');
+}
+
 function setRole(id, role) {
     fetch('/api/admin/users/' + id + '/role', {
         method: 'POST',
@@ -618,10 +655,18 @@ function setRole(id, role) {
     })
     .then(function(r){ return r.json(); })
     .then(function(d){
-        if (!d.success) { alert(d.message || 'Failed to update role'); return; }
+        if (!d.success) alert(d.message || 'Failed to update role');
+        if (d.success && myUserId !== null && id === myUserId && role !== 'admin') {
+            // We just removed our own admin rights — every further admin call
+            // would 403, so hand off to the tech app once the change has landed.
+            window.location.replace('/');
+            return;
+        }
+        // Reload on failure too, so a rejected change (e.g. last admin) snaps
+        // the dropdown back instead of showing a value that never applied.
         loadUsers();
     })
-    .catch(function(){ alert('Network error'); });
+    .catch(function(){ alert('Network error'); loadUsers(); });
 }
 
 function deleteUser(id) {
@@ -629,10 +674,10 @@ function deleteUser(id) {
     fetch('/api/admin/users/' + id + '/delete', { method: 'POST' })
         .then(function(r){ return r.json(); })
         .then(function(d){
-            if (!d.success) { alert(d.message || 'Failed to delete'); return; }
+            if (!d.success) alert(d.message || 'Failed to delete');
             loadUsers();
         })
-        .catch(function(){ alert('Network error'); });
+        .catch(function(){ alert('Network error'); loadUsers(); });
 }
 
 // --- FEEDBACK ---
@@ -659,8 +704,26 @@ function loadFeedback() {
         .catch(function(){});
 }
 
+// Notes the admin has typed but not saved, keyed by textarea id. Compared
+// against data-saved (the server's copy) rather than the DOM's own default so
+// a re-render triggered by saving a different row can't wipe them.
+function fbDrafts() {
+    var drafts = {};
+    var notes = document.querySelectorAll('#fbTable .fb-admin-note');
+    for (var i = 0; i < notes.length; i++) {
+        if (notes[i].value !== (notes[i].getAttribute('data-saved') || '')) drafts[notes[i].id] = notes[i].value;
+    }
+    return drafts;
+}
+
 function renderFeedback(rows) {
     var tbody = document.querySelector('#fbTable tbody');
+    // Snapshot in-progress edits and focus before the tbody is rebuilt.
+    var drafts = fbDrafts();
+    var active = document.activeElement;
+    var activeId = (active && active.id && tbody.contains(active)) ? active.id : null;
+    var selStart = null, selEnd = null;
+    if (activeId && typeof active.selectionStart === 'number') { selStart = active.selectionStart; selEnd = active.selectionEnd; }
     var filtered = rows.filter(function(f){
         if (fbFilter === 'open') return f.status === 'new' || f.status === 'in_progress';
         if (fbFilter === 'all') return true;
@@ -707,7 +770,7 @@ function renderFeedback(rows) {
              + '<td><span class="pill ' + (catPill[f.category] || '') + '">' + esc(f.category) + '</span></td>'
              + '<td class="q-cell">'
              +   '<div>' + esc(f.message) + '</div>'
-             +   '<textarea class="fb-admin-note" id="fbNote' + f.id + '" rows="2" placeholder="Note to user (visible on their feedback tab)…" maxlength="4000">' + reply + '</textarea>'
+             +   '<textarea class="fb-admin-note" id="fbNote' + f.id + '" rows="2" placeholder="Note to user (visible on their feedback tab)…" maxlength="4000" data-saved="' + reply + '">' + reply + '</textarea>'
              +   '<button class="user-filter" onclick="saveFbReply(' + f.id + ')">Save note</button>'
              + '</td>'
              + '<td>' + ctx + '</td>'
@@ -715,6 +778,21 @@ function renderFeedback(rows) {
              + '<td><label class="fb-pin"><input type="checkbox"' + pinned + ' onchange="setFbPin(' + f.id + ', this.checked)"> known</label></td>'
              + '</tr>';
     }).join('');
+
+    // Put unsaved drafts back and return focus (with caret) to where it was.
+    Object.keys(drafts).forEach(function(id){
+        var ta = document.getElementById(id);
+        if (ta) ta.value = drafts[id];
+    });
+    if (activeId) {
+        var again = document.getElementById(activeId);
+        if (again) {
+            again.focus();
+            if (selStart !== null && typeof again.setSelectionRange === 'function') {
+                try { again.setSelectionRange(selStart, selEnd); } catch (_) {}
+            }
+        }
+    }
 }
 
 function setFbStatus(id, status) {
@@ -725,10 +803,10 @@ function setFbStatus(id, status) {
     })
     .then(function(r){ return r.json(); })
     .then(function(d){
-        if (!d.success) { alert(d.message || 'Failed to update'); return; }
+        if (!d.success) alert(d.message || 'Failed to update');
         loadFeedback();
     })
-    .catch(function(){ alert('Network error'); });
+    .catch(function(){ alert('Network error'); loadFeedback(); });
 }
 
 function setFbPin(id, pin) {
@@ -739,10 +817,10 @@ function setFbPin(id, pin) {
     })
     .then(function(r){ return r.json(); })
     .then(function(d){
-        if (!d.success) { alert(d.message || 'Failed to update'); return; }
+        if (!d.success) alert(d.message || 'Failed to update');
         loadFeedback();
     })
-    .catch(function(){ alert('Network error'); });
+    .catch(function(){ alert('Network error'); loadFeedback(); });
 }
 
 function saveFbReply(id) {
@@ -756,6 +834,8 @@ function saveFbReply(id) {
     .then(function(r){ return r.json(); })
     .then(function(d){
         if (!d.success) { alert(d.message || 'Failed to save'); return; }
+        // Mark this note as saved so the draft guard stops treating it as dirty.
+        ta.setAttribute('data-saved', ta.value);
         loadFeedback();
     })
     .catch(function(){ alert('Network error'); });
@@ -763,8 +843,14 @@ function saveFbReply(id) {
 
 function load() {
     fetch('/api/admin/overview')
-        .then(function(r){ return r.json(); })
+        .then(function(r){
+            // Lost admin rights since the page loaded (another admin changed
+            // our role) — the dashboard is dead; go back to the tech app.
+            if (r.status === 403) { window.location.replace('/'); return null; }
+            return r.json();
+        })
         .then(function(d){
+            if (d === null) return;
             if (!d.success) throw new Error('not ok');
             document.getElementById('hubLink').href = d.hubUrl || 'https://freedomboatclub.ai';
             document.getElementById('metaLine').innerHTML =
@@ -781,8 +867,11 @@ function load() {
             document.getElementById('metaLine').textContent = 'Failed to load. Refresh.';
             console.error(e);
         });
-    loadUsers();
-    loadFeedback();
+    // The periodic refresh must never destroy in-progress work: an open role
+    // or status dropdown, a focused control, or a half-typed note. Manual
+    // actions call loadUsers()/loadFeedback() directly, so they still refresh.
+    if (!isEditing('usersTable')) loadUsers();
+    if (!isEditing('fbTable') && !Object.keys(fbDrafts()).length) loadFeedback();
 }
 
 load();
