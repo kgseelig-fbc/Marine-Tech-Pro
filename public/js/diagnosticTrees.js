@@ -1,7 +1,10 @@
 // js/diagnosticTrees.js
-// Complete diagnostic decision tree database
-// Contains: Engine No Start, Overheating, Runs Rough,
-// Charging/Electrical, Trim/Steering, Electronics
+// Complete diagnostic decision tree database (13 trees).
+// Contains: Engine No Start, Overheating, Runs Rough, Yamaha Flash Codes,
+// Charging/Electrical, Trim/Steering, Electronics, Stereo/Audio,
+// Navigation Lights, Horn, Bilge Pump, Livewell Pump, Washdown Pump.
+// Every tree needs a matching menu card in diagnose.html — `npm run validate`
+// fails on a tree without a card or a card without a tree.
 
 window.defined_trees = {
 

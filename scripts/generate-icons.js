@@ -15,8 +15,9 @@
 // is guaranteed to survive. The FBC badge is a circle whose rim carries the
 // "FREEDOM BOAT CLUB" wordmark right up to the edge of the square, so a
 // full-bleed maskable icon would have that wordmark sliced off by every mask.
-// The maskable variants therefore scale the badge to 80% and pad with the
-// logo's own white surround, which bleeds to all four edges.
+// The maskable variants therefore scale the badge to 78% (BADGE_SCALE — just
+// inside the 80% safe zone so antialiasing cannot spill over it) and pad with
+// the logo's own white surround, which bleeds to all four edges.
 //
 // The `purpose: "any"` icons stay full-bleed: nothing crops them, and the
 // badge should fill the space where it is shown intact.

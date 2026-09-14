@@ -6,10 +6,14 @@
 //
 // Strategy:
 //   /api/*        -> network only, never cached (auth + live data)
-//   HTML pages    -> network first, fall back to cache, then to an offline
-//                    notice, so deploys land immediately when online. When a
-//                    cached copy exists the network gets HTML_NETWORK_TIMEOUT_MS
-//                    before that copy is served, and a 5xx falls back to it too
+//   HTML pages    -> network first, then the cached copy (current generation,
+//                    then a retained older one), then the cached Home shell,
+//                    then an offline notice — NO_SHELL pages (/admin and the
+//                    public pages) skip the shell and get the notice directly.
+//                    Deploys land immediately when online; when a cached copy
+//                    exists the network gets HTML_NETWORK_TIMEOUT_MS before
+//                    that copy is served, and a 5xx falls back to it too.
+//                    /login, /pending and /logout always go to the network.
 //   JS/CSS/icons  -> stale-while-revalidate: instant from cache, refreshed
 //                    in the background for the next load
 //

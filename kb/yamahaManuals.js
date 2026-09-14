@@ -24,7 +24,9 @@
 // transcription error; do not "correct" it). PRESSURE pairs (kPa / PSI)
 // were normalised so a kPa gauge and a PSI gauge give the same
 // pass/fail — see the F115C compression note in §2. `npm run validate`
-// checks every such pair (pressure within 1.5 PSI, torque within 3 %).
+// checks every unit pair in this file (pressure within 1.5 PSI; torque
+// within 3 % or 1 ft-lb, whichever is larger; cc/L capacities against
+// US oz/qt within 2 %).
 
 window.yamahaManualReference = `
 ================================================================

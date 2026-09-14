@@ -30,7 +30,7 @@ npm run check     # syntax-checks every shipped JS file, then validates the data
 npm run validate  # data validation only
 ```
 
-The suites need no API key or network: the Ask-a-Tech tests point the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL`. CI (`.github/workflows/ci.yml`) runs `npm run check`, the tests, and a production dependency audit on every push and pull request.
+The suites need no API key or network: the Ask-a-Tech tests point the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL`. CI (`.github/workflows/ci.yml`) runs `npm run check`, the tests, and a production dependency audit on every pull request and on every push to `main`.
 
 ## Deploy on Railway
 
@@ -83,7 +83,7 @@ If a Google sign-in uses an email that already has a local account, the sign-in 
 | `pending` | see `/pending` only |
 | `tech` | use the app |
 | `admin` | use the app and `/admin` (users, feedback, usage, errors) |
-| `denied` | nothing; sessions are ended on the next request |
+| `denied` | nothing; API calls get 403, and the session is destroyed on the next page load (or visit to `/login`) |
 
 Deleting a user from `/admin` also removes their usage events and AI transcripts and detaches their name and email from any feedback they filed (the feedback text itself stays, as it is the bug tracker).
 
