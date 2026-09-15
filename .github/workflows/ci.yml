@@ -21,6 +21,8 @@ jobs:
       # `npm run check` syntax-checks every shipped JS file (server, lib/,
       # scripts/, public/js/ and the service worker — a stray character in
       # common.js breaks sign-out on every page and no test would load it),
+      # parses the inline <script> blocks in the HTML pages (where most of the
+      # browser code actually lives, and which `node --check` cannot see into),
       # then validates the hand-maintained diagnostic trees, fault codes and
       # specs: broken node references and dead ends are otherwise invisible
       # until a technician hits one in the field. One script, so this list and

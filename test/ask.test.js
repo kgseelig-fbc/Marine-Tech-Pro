@@ -20,6 +20,7 @@
 const { test, before, after, describe } = require('node:test');
 const assert = require('node:assert');
 const H = require('./helpers');
+const pricing = require('../lib/pricing');
 
 let app;
 let mock;
@@ -97,6 +98,11 @@ describe('the request sent to the Anthropic API', () => {
             'losing this silently re-pays a ~100K-token cache write on every question'
         );
         assert.ok(kb.text.length > 100000, `knowledge base looks truncated (${kb.text.length} chars)`);
+        // The TTL sent here and the TTL the dashboard prices cache writes at
+        // are one constant: a 1h write costs 2x fresh input, a 5m write 1.25x,
+        // so a change on one side alone would make the reported spend wrong.
+        assert.equal(kb.cache_control.ttl, pricing.CACHE_TTL,
+            'the request TTL must be the one lib/pricing.js bills for');
     });
 
     // The three public data files alone clear the size check above, so a
@@ -144,6 +150,59 @@ describe('what the admin dashboard can see afterwards', () => {
         assert.ok(o.summary.last24h.aiCacheReadTokens >= 90000,
             `aiCacheReadTokens ${o.summary.last24h.aiCacheReadTokens} should include this request`);
         assert.equal(typeof o.summary.last24h.aiCacheWriteTokens, 'number');
+    });
+
+    // What a question cost is the reason the token columns are worth storing.
+    // The trap this guards: tokens_in already CONTAINS the 90K cached tokens,
+    // so pricing that column at the full input rate bills a cache hit as if
+    // nothing had been cached — an order of magnitude over the real figure,
+    // and a wrong number is worse than no number on a spend dashboard.
+    test('the dashboard reports what each question cost, priced as a cache hit', async () => {
+        mock.setMode('ok');
+        assert.equal((await ask({ question: 'what does this cost' })).status, 200);
+
+        const o = await overview();
+        const row = o.recentAi[0];
+        assert.equal(row.question, 'what does this cost');
+        assert.equal(row.model, 'claude-sonnet-5', 'the row must say which model it was billed against');
+        // 12 fresh input + 90000 cache reads + 8 output, at Sonnet 5 rates.
+        assert.equal(row.cost_usd, 0.018104);
+        assert.ok(row.cost_usd < row.tokens_in * pricing.RATES['claude-sonnet-5'].input / 1e6 / 5,
+            'cached prompt tokens must not be billed at the fresh-input rate');
+
+        const usage = o.summary.aiUsage;
+        assert.ok(usage && usage.last24h && usage.last7d && usage.last30d && usage.total,
+            'the overview must carry all four spend windows');
+        assert.ok(usage.last24h.costUsd >= 0.018104,
+            `24h cost ${usage.last24h.costUsd} should include this question`);
+        // Bounded from above as well: every question this suite asks is a cache
+        // hit worth about two cents, so a total anywhere near the naive
+        // "price tokens_in as fresh input" figure (~18c each) is the headline
+        // bug, and a one-sided assertion would sail straight past it.
+        assert.ok(usage.last24h.costUsd < usage.last24h.asks * 0.05,
+            `24h cost ${usage.last24h.costUsd} over ${usage.last24h.asks} cached asks looks like cached tokens billed as fresh input`);
+        assert.equal(usage.last24h.unsplitAsks, 0, 'every question here recorded its cache split');
+        assert.ok(usage.last24h.asks >= 1);
+        assert.equal(usage.last24h.unpricedAsks, 0, 'the model in use must have a published rate');
+        assert.ok(usage.last24h.byModel.some((m) => m.model === 'claude-sonnet-5'));
+        assert.ok(usage.total.costUsd >= usage.last24h.costUsd,
+            'a wider window cannot cost less than a narrower one inside it');
+    });
+
+    test('a failed call is counted as an ask but costs nothing', async () => {
+        mock.setMode('500');
+        const before = (await overview()).summary.aiUsage.last24h;
+        // Which 5xx an upstream failure maps to is pinned elsewhere; what
+        // matters here is that a call that cost nothing is billed as nothing.
+        assert.ok((await ask({ question: 'upstream is down' })).status >= 500);
+
+        const after = (await overview()).summary.aiUsage.last24h;
+        assert.ok(after.asks > before.asks, 'a failed question is still a question');
+        assert.equal(after.costUsd, before.costUsd, 'no usage was reported, so nothing is billed');
+        const row = (await overview()).recentAi[0];
+        assert.equal(row.cost_usd, 0);
+        assert.equal(row.model, 'claude-sonnet-5',
+            'the failed call still records which model was attempted');
     });
 });
 
