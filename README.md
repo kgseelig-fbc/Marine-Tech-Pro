@@ -87,6 +87,16 @@ If a Google sign-in uses an email that already has a local account, the sign-in 
 
 Deleting a user from `/admin` also removes their usage events and AI transcripts and detaches their name and email from any feedback they filed (the feedback text itself stays, as it is the bug tracker).
 
+## What Ask-a-Tech costs
+
+`/admin` reports Ask-a-Tech token use and its dollar cost over the last 24 hours, 7 days, 30 days and everything telemetry retention has kept. Each question also shows its own cost in the recent-questions table.
+
+The figure is computed from the token counts on each stored question, priced with Anthropic's published list prices in `lib/pricing.js` — it estimates the API line on the bill, it is not the bill. Three things are worth knowing when reading it:
+
+- **Input, cache reads and cache writes are priced differently** and shown in separate columns. A cached prompt token costs a tenth of a fresh one; writing the cache costs double. The knowledge base is ~100K tokens, so a question that reads the cache costs about two cents and the same question that rewrites it costs about fifty — which is what the cache hit rate on the same page is warning about.
+- **`All recorded` ends where pruning does.** Rows older than `RETENTION_DAYS` (default 90) are gone, so on a long-lived instance this is a 90-day total, not a lifetime one.
+- **Rates go stale.** They were checked in September 2026. If a question is answered by a model with no rate in `lib/pricing.js`, its tokens still count but its dollars are left out, and the dashboard says how many questions that covers rather than quietly under-reporting. Changing the model in `server.js` means adding its rate in the same commit.
+
 ## Data and privacy notes for operators
 
 - Events and AI transcripts store a salted one-way hash of the IP, never the address.

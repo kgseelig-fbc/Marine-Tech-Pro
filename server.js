@@ -10,6 +10,7 @@ const fs = require('fs');
 const Anthropic = require('@anthropic-ai/sdk');
 const datastore = require('./lib/db');
 const auth = require('./lib/auth');
+const pricing = require('./lib/pricing');
 
 const app = express();
 app.set("trust proxy", 1);
@@ -744,6 +745,11 @@ app.get('/', (req, res) => {
 // --- ASK-A-TECH AI ENDPOINT ---
 
 const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
+// The model every question is billed against. Stored on each ai_messages row
+// so the dashboard can price a window at the rate that actually applied —
+// change it here and add the new model's rate to lib/pricing.js in the same
+// commit, or the spend total silently stops counting those questions.
+const AI_MODEL = 'claude-sonnet-5';
 // Explicit budget: without these, the SDK defaults to a 10-minute timeout with
 // 2 retries — a degraded upstream could hold a tech's phone connection ~30 min.
 // The widget's ASK_TIMEOUT_MS (public/js/askTech.js) must cover the worst case
@@ -864,6 +870,10 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
     // answer path (the most expensive failure: a full prompt with nothing
     // usable back) shows its real token cost in the admin table too.
     const usageFields = (usage) => ({
+        // What this question was billed against. Rates are per model, so the
+        // dashboard's dollar figure is only attributable if the row says which
+        // model produced it (lib/pricing.js).
+        model: AI_MODEL,
         tokens_in: (usage.input_tokens || 0) + (usage.cache_read_input_tokens || 0) + (usage.cache_creation_input_tokens || 0),
         tokens_out: usage.output_tokens || 0,
         // Kept apart from tokens_in so the admin panel can see whether the
@@ -876,7 +886,7 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
 
     try {
         const msg = await anthropicClient.messages.create({
-            model: 'claude-sonnet-5',
+            model: AI_MODEL,
             // Sonnet 5 caps thinking AND answer text against max_tokens together.
             // On Sonnet 4.6 omitting `thinking` meant no thinking, so 1024 was
             // all answer; here it would truncate a tech mid-sentence. 4096 leaves
@@ -895,8 +905,11 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
                     text: KB_SYSTEM_TEXT,
                     // 1h TTL: field usage is bursty and sporadic — the default
                     // 5-minute TTL misses most reads and re-pays the ~100K-token
-                    // cache write on nearly every question.
-                    cache_control: { type: 'ephemeral', ttl: '1h' }
+                    // cache write on nearly every question. The TTL comes from
+                    // lib/pricing.js because a cache write is billed at 2x fresh
+                    // input at 1h and 1.25x at 5m: one constant, so the price the
+                    // dashboard reports can never drift from the TTL sent here.
+                    cache_control: { type: 'ephemeral', ttl: pricing.CACHE_TTL }
                 }
             ],
             messages: [
@@ -962,6 +975,7 @@ app.post('/api/ask', askLimiter, wrap(async (req, res) => {
             question,
             ctx_tree: ctx.tree || null,
             ctx_node: ctx.node || null,
+            model: AI_MODEL,
             duration_ms: Date.now() - started,
             ok: false,
             error: err.message

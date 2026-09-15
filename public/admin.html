@@ -334,6 +334,25 @@
     </section>
 
     <section class="panel">
+        <h2><svg class="icon"><use href="/icons/sprite.svg#i-gauge"/></svg> Ask-a-Tech tokens &amp; API cost</h2>
+        <div style="overflow-x:auto;">
+            <table class="mtp" id="usageTable">
+                <thead><tr>
+                    <th>Window</th>
+                    <th style="text-align:right;">Asks</th>
+                    <th style="text-align:right;">Input</th>
+                    <th style="text-align:right;">Cache read</th>
+                    <th style="text-align:right;">Cache write</th>
+                    <th style="text-align:right;">Output</th>
+                    <th style="text-align:right;">Cost</th>
+                </tr></thead>
+                <tbody></tbody>
+            </table>
+        </div>
+        <div class="meta-line" style="margin-top:10px;" id="usageNote"></div>
+    </section>
+
+    <section class="panel">
         <h2><svg class="icon"><use href="/icons/sprite.svg#i-ai"/></svg> Recent AI questions</h2>
         <div style="overflow-x:auto;">
             <table class="mtp" id="aiTable">
@@ -342,6 +361,7 @@
                     <th>Question</th>
                     <th>Context</th>
                     <th>Tokens</th>
+                    <th style="text-align:right;">Cost</th>
                     <th>Lat.</th>
                     <th>OK</th>
                 </tr></thead>
@@ -385,6 +405,28 @@ function fmtTime(ts) {
     if (diff < 86400) return Math.floor(diff/3600) + 'h ago';
     return d.toLocaleString();
 }
+// 1234 -> 1.2K, 1234567 -> 1.23M. Raw counts below 1000; the dashboard shows
+// hundreds of thousands of cached tokens per question and the digits stop
+// carrying information long before that.
+function fmtTokens(n) {
+    n = Number(n) || 0;
+    if (n < 1000) return String(n);
+    if (n < 1e6) return (n / 1000).toFixed(n < 10000 ? 1 : 0) + 'K';
+    return (n / 1e6).toFixed(2) + 'M';
+}
+
+// Dollars, with enough precision to be useful at both ends: a single question
+// costs about two cents, a month of them a few dollars. null means the model
+// has no rate in lib/pricing.js — shown as '?', never as $0.00.
+function fmtUsd(n) {
+    if (n === null || n === undefined || !isFinite(n)) return '?';
+    n = Number(n);
+    if (n === 0) return '$0.00';
+    if (n < 0.01) return '$' + n.toFixed(4);
+    if (n < 1) return '$' + n.toFixed(3);
+    return '$' + n.toFixed(2);
+}
+
 function esc(s) {
     if (s == null) return '';
     return String(s).replace(/[&<>"']/g, function(c){
@@ -467,7 +509,7 @@ function renderTopTrees(rows) {
 
 function renderAi(rows) {
     var tbody = document.querySelector('#aiTable tbody');
-    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="6" class="empty">No AI questions yet.</td></tr>'; return; }
+    if (!rows.length) { tbody.innerHTML = '<tr><td colspan="7" class="empty">No AI questions yet.</td></tr>'; return; }
     tbody.innerHTML = rows.map(function(r){
         var ctx = r.ctx_tree ? esc(r.ctx_tree) + (r.ctx_node ? ' / ' + esc(r.ctx_node) : '') : '<span class="mono">—</span>';
         var tokens = (r.tokens_in || 0) + ' / ' + (r.tokens_out || 0);
@@ -475,11 +517,17 @@ function renderAi(rows) {
         if (typeof r.cache_read === 'number' && r.cache_read > 0) {
             tokens += '<span class="pill ai cached" title="' + r.cache_read + ' prompt tokens served from cache">cached</span>';
         }
+        // cost_usd is absent on servers that predate cost reporting, and null
+        // for a model with no rate — both show '—' rather than a made-up $0.00.
+        var cost = typeof r.cost_usd === 'number'
+            ? '<span title="Estimated at list price">' + fmtUsd(r.cost_usd) + '</span>'
+            : '—';
         return '<tr>'
              + '<td class="mono">' + fmtTime(r.ts) + '</td>'
              + '<td class="q-cell">' + esc(r.question) + '</td>'
              + '<td>' + ctx + '</td>'
              + '<td class="mono">' + tokens + '</td>'
+             + '<td class="mono" style="text-align:right;">' + cost + '</td>'
              + '<td class="mono">' + (r.duration_ms ? r.duration_ms + 'ms' : '—') + '</td>'
              + '<td>' + (r.ok ? '<span class="pill ok">ok</span>' : '<span class="pill fail">fail</span>') + '</td>'
              + '</tr>';
@@ -522,20 +570,87 @@ function renderEvents(rows) {
     }).join('');
 }
 
+// Tokens and dollars per window. Input is FRESH input only: cached reads and
+// cache writes are their own columns because they are priced differently
+// (a tenth of input, and double it), which is the whole reason a mostly-cached
+// workload is affordable at ~100K prompt tokens a question.
+function renderUsage(u) {
+    var tbody = document.querySelector('#usageTable tbody');
+    var note = document.getElementById('usageNote');
+    if (!tbody) return;
+    if (!u || !u.last24h) {
+        tbody.innerHTML = '<tr><td colspan="7" class="empty">This server does not report token usage.</td></tr>';
+        if (note) note.textContent = '';
+        return;
+    }
+
+    var windows = [
+        ['Last 24 hours', u.last24h],
+        ['Last 7 days',   u.last7d],
+        ['Last 30 days',  u.last30d],
+        ['All recorded',  u.total]
+    ];
+    tbody.innerHTML = windows.map(function(w){
+        var label = w[0], d = w[1] || {};
+        var n = function(v){ return '<td class="mono" style="text-align:right;">' + fmtTokens(v) + '</td>'; };
+        return '<tr>'
+             + '<td>' + esc(label) + '</td>'
+             + '<td class="mono" style="text-align:right;">' + (d.asks || 0) + '</td>'
+             + n(d.inputTokens) + n(d.cacheReadTokens) + n(d.cacheWriteTokens) + n(d.outputTokens)
+             + '<td class="mono" style="text-align:right;">' + fmtUsd(d.costUsd) + '</td>'
+             + '</tr>';
+    }).join('');
+
+    if (!note) return;
+    // Say what the number is and is not: list price, not an invoice; and
+    // "all recorded" ends where telemetry pruning does.
+    var models = (u.total.byModel || []).map(function(m){
+        return esc(m.model) + ' · ' + m.asks + ' asks · ' + fmtUsd(m.costUsd);
+    });
+    var parts = ['<span>Estimated at Anthropic list prices (lib/pricing.js), not billed amounts.</span>',
+                 '<span>“All recorded” covers what telemetry retention has kept.</span>'];
+    if (models.length) parts.push('<span>' + models.join(' · ') + '</span>');
+    if (u.total.unpricedAsks) {
+        parts.push('<span class="pill warn">' + u.total.unpricedAsks
+                 + ' asks on a model with no rate — their cost is missing from the total</span>');
+    }
+    note.innerHTML = parts.join('');
+}
+
 function renderStats(s) {
     var g = document.getElementById('statGrid');
     // Older servers don't report cache tokens — treat absent as 0, show '—' for no traffic.
     var reads  = typeof s.last24h.aiCacheReadTokens  === 'number' ? s.last24h.aiCacheReadTokens  : 0;
     var writes = typeof s.last24h.aiCacheWriteTokens === 'number' ? s.last24h.aiCacheWriteTokens : 0;
     var hitRate = (reads + writes) > 0 ? Math.round(reads / (reads + writes) * 100) + '%' : '\u2014';
+
+    // Older servers don't report usage at all — leave the two spend tiles out
+    // rather than showing a confident $0.00 for data that was never sent.
+    var u = s.aiUsage;
+    var costTiles = '';
+    if (u && u.last24h && u.total) {
+        costTiles =
+              stat('AI cost (24h)',   fmtUsd(u.last24h.costUsd),
+                   fmtUsd(u.last7d && u.last7d.costUsd) + ' past 7d', 'i-gauge')
+            // "in" here is every prompt token — fresh, cached and written —
+            // so the split reconciles with the total above it, and matches what
+            // the Tokens column in the questions table has always shown.
+            + stat('AI tokens (24h)', fmtTokens(u.last24h.totalTokens),
+                   fmtTokens(u.last24h.totalTokens - u.last24h.outputTokens) + ' in / '
+                     + fmtTokens(u.last24h.outputTokens) + ' out', 'i-ai');
+    }
+
     g.innerHTML =
           stat('Logins (24h)',       s.last24h.logins,       s.last24h.loginFail + ' failed',     'i-lock')
         + stat('Unique users (24h)', s.last24h.uniqueUsers,  s.last7d.uniqueUsers + ' past 7d',    'i-home')
         + stat('Diagnostics (24h)',  s.last24h.treeStarts,   s.last7d.treeStarts + ' past 7d',     'i-wrench')
         + stat('Fault lookups (24h)',s.last24h.faultLookups, '',                                   'i-alert')
         + stat('AI asks (24h)',      s.last24h.aiAsks,       s.last7d.aiAsks + ' past 7d',         'i-ai')
-        + stat('AI cache (24h)',     hitRate,                reads + ' read / ' + writes + ' written', 'i-ai')
+        + stat('AI cache (24h)',     hitRate,                fmtTokens(reads) + ' read / ' + fmtTokens(writes) + ' written', 'i-ai')
+        + costTiles
         + stat('Total events',       s.total.events,         s.total.aiMessages + ' AI messages',  'i-gauge');
+
+    renderUsage(s.aiUsage);
 }
 
 // --- USER MANAGEMENT ---
