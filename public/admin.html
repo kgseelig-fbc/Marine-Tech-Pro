@@ -340,7 +340,7 @@
                 <thead><tr>
                     <th>Window</th>
                     <th style="text-align:right;">Asks</th>
-                    <th style="text-align:right;">Input</th>
+                    <th style="text-align:right;">Fresh input</th>
                     <th style="text-align:right;">Cache read</th>
                     <th style="text-align:right;">Cache write</th>
                     <th style="text-align:right;">Output</th>
@@ -415,16 +415,28 @@ function fmtTokens(n) {
     return (n / 1e6).toFixed(2) + 'M';
 }
 
-// Dollars, with enough precision to be useful at both ends: a single question
-// costs about two cents, a month of them a few dollars. null means the model
-// has no rate in lib/pricing.js — shown as '?', never as $0.00.
-function fmtUsd(n) {
+// Dollars at a FIXED number of places, so a column of them lines up: totals in
+// cents (2), single questions in hundredths of a cent (4), since one question
+// costs around two cents. A non-zero amount too small to show reads '<$0.01'
+// rather than rounding down to nothing. null means the cost is unknown — no
+// published rate, or a row that predates cache accounting — and shows '?',
+// never $0.00.
+function fmtUsd(n, dp) {
     if (n === null || n === undefined || !isFinite(n)) return '?';
     n = Number(n);
-    if (n === 0) return '$0.00';
-    if (n < 0.01) return '$' + n.toFixed(4);
-    if (n < 1) return '$' + n.toFixed(3);
-    return '$' + n.toFixed(2);
+    if (dp === undefined) dp = 2;
+    var floor = Math.pow(10, -dp);
+    if (n > 0 && n < floor) return '<$' + floor.toFixed(dp);
+    return '$' + n.toFixed(dp);
+}
+
+// A cost that is missing some of its questions is marked, not quietly shown as
+// if it were the whole bill.
+function fmtWindowCost(d) {
+    var text = fmtUsd(d.costUsd, 2);
+    if (!d.uncostedAsks) return text;
+    return '<span title="' + d.uncostedAsks + ' of ' + d.asks
+         + ' questions in this window could not be priced — see the note below">' + text + '+</span>';
 }
 
 function esc(s) {
@@ -520,8 +532,8 @@ function renderAi(rows) {
         // cost_usd is absent on servers that predate cost reporting, and null
         // for a model with no rate — both show '—' rather than a made-up $0.00.
         var cost = typeof r.cost_usd === 'number'
-            ? '<span title="Estimated at list price">' + fmtUsd(r.cost_usd) + '</span>'
-            : '—';
+            ? '<span title="Estimated at list price">' + fmtUsd(r.cost_usd, 4) + '</span>'
+            : '<span title="Not priced: no published rate for this model, or the question predates prompt-cache accounting">—</span>';
         return '<tr>'
              + '<td class="mono">' + fmtTime(r.ts) + '</td>'
              + '<td class="q-cell">' + esc(r.question) + '</td>'
@@ -578,7 +590,7 @@ function renderUsage(u) {
     var tbody = document.querySelector('#usageTable tbody');
     var note = document.getElementById('usageNote');
     if (!tbody) return;
-    if (!u || !u.last24h) {
+    if (!u || !u.last24h || !u.total) {
         tbody.innerHTML = '<tr><td colspan="7" class="empty">This server does not report token usage.</td></tr>';
         if (note) note.textContent = '';
         return;
@@ -597,22 +609,31 @@ function renderUsage(u) {
              + '<td>' + esc(label) + '</td>'
              + '<td class="mono" style="text-align:right;">' + (d.asks || 0) + '</td>'
              + n(d.inputTokens) + n(d.cacheReadTokens) + n(d.cacheWriteTokens) + n(d.outputTokens)
-             + '<td class="mono" style="text-align:right;">' + fmtUsd(d.costUsd) + '</td>'
+             + '<td class="mono" style="text-align:right;">' + fmtWindowCost(d) + '</td>'
              + '</tr>';
     }).join('');
 
     if (!note) return;
-    // Say what the number is and is not: list price, not an invoice; and
-    // "all recorded" ends where telemetry pruning does.
+    // Say what the number is and is not: list price rather than an invoice,
+    // where the windows stop, and which questions are missing from the cost.
+    var parts = ['<span>Estimated at Anthropic list prices (lib/pricing.js), not billed amounts.</span>'];
+    if (u.retentionDays) {
+        parts.push('<span>Windows longer than the ' + esc(u.retentionDays)
+                 + '-day retention window show only what pruning has kept.</span>');
+    }
     var models = (u.total.byModel || []).map(function(m){
-        return esc(m.model) + ' · ' + m.asks + ' asks · ' + fmtUsd(m.costUsd);
+        return esc(m.model) + ' · ' + m.asks + ' asks · ' + fmtUsd(m.costUsd, 2);
     });
-    var parts = ['<span>Estimated at Anthropic list prices (lib/pricing.js), not billed amounts.</span>',
-                 '<span>“All recorded” covers what telemetry retention has kept.</span>'];
     if (models.length) parts.push('<span>' + models.join(' · ') + '</span>');
-    if (u.total.unpricedAsks) {
-        parts.push('<span class="pill warn">' + u.total.unpricedAsks
-                 + ' asks on a model with no rate — their cost is missing from the total</span>');
+
+    var t = u.total;
+    if (t.uncostedAsks) {
+        var why = [];
+        if (t.unpricedAsks) why.push(t.unpricedAsks + ' on a model with no published rate');
+        if (t.unsplitAsks) why.push(t.unsplitAsks + ' recorded before prompt-cache accounting ('
+                                  + fmtTokens(t.unsplitPromptTokens) + ' prompt tokens, unknown split)');
+        parts.push('<span style="color:var(--warn);">' + t.uncostedAsks
+                 + ' of ' + t.asks + ' questions are missing from the cost: ' + why.join(', ') + '.</span>');
     }
     note.innerHTML = parts.join('');
 }
@@ -629,15 +650,17 @@ function renderStats(s) {
     var u = s.aiUsage;
     var costTiles = '';
     if (u && u.last24h && u.total) {
+        // "prompt" is every prompt token — fresh, cached and written — so the
+        // split reconciles with the total beside it. The panel below splits the
+        // same tokens into the three columns that are priced differently.
+        var day = u.last24h;
         costTiles =
-              stat('AI cost (24h)',   fmtUsd(u.last24h.costUsd),
-                   fmtUsd(u.last7d && u.last7d.costUsd) + ' past 7d', 'i-gauge')
-            // "in" here is every prompt token — fresh, cached and written —
-            // so the split reconciles with the total above it, and matches what
-            // the Tokens column in the questions table has always shown.
-            + stat('AI tokens (24h)', fmtTokens(u.last24h.totalTokens),
-                   fmtTokens(u.last24h.totalTokens - u.last24h.outputTokens) + ' in / '
-                     + fmtTokens(u.last24h.outputTokens) + ' out', 'i-ai');
+              stat('AI cost (24h)',   fmtUsd(day.costUsd, 2),
+                   fmtUsd(u.last7d && u.last7d.costUsd, 2) + ' past 7d'
+                     + (day.uncostedAsks ? ' · ' + day.uncostedAsks + ' unpriced' : ''), 'i-gauge')
+            + stat('AI tokens (24h)', fmtTokens(day.totalTokens),
+                   fmtTokens(day.totalTokens - day.outputTokens) + ' prompt / '
+                     + fmtTokens(day.outputTokens) + ' out', 'i-ai');
     }
 
     g.innerHTML =

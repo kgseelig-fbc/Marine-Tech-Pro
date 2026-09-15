@@ -266,19 +266,29 @@ describe('token spend and cost', () => {
     // misread: tokens_in already contains cache reads and writes, and a cache
     // write costs twice fresh input. lib/pricing.js owns that arithmetic and
     // test/pricing.test.js pins it; these tests pin the aggregation around it —
-    // the window filter, the per-model split, and what happens to a model with
-    // no published rate.
+    // which window a question lands in, the per-model split, and the two kinds
+    // of question that cannot be priced honestly.
     const SONNET = 'claude-sonnet-5';
     const near = (a, b, why) => assert.ok(Math.abs(a - b) < 1e-6, `${why}: ${a} vs ${b}`);
+
+    // Rows at a chosen age. logAi always stamps `now`, and half of what is
+    // being tested here is which window a row falls into.
+    const insertAt = (ageMs, row) => ds.db.prepare(`
+        INSERT INTO ai_messages(ts, question, answer, ok, tokens_in, tokens_out, cache_read, cache_write, model)
+        VALUES (?,?,?,?,?,?,?,?,?)
+    `).run(Date.now() - ageMs, row.question, 'a', row.ok === 0 ? 0 : 1,
+        row.tokens_in ?? null, row.tokens_out ?? null,
+        row.cache_read ?? null, row.cache_write ?? null, row.model ?? null);
+
+    const HIT  = { tokens_in: 90012,  tokens_out: 8, cache_read: 90000, cache_write: 0 };      // $0.018104
+    const COLD = { tokens_in: 120012, tokens_out: 8, cache_read: 0, cache_write: 120000 };     // $0.480104
 
     test('getSummary totals tokens and dollars per window, keeping unpriced models visible', () => {
         const before = ds.getSummary().aiUsage.last24h;
         assert.equal(typeof before.costUsd, 'number');
 
-        // A cache hit, a cache miss, and a question on a model nobody has
-        // published a rate for.
-        ds.logAi({ question: 'hit',  answer: 'a', ok: true, model: SONNET, tokens_in: 90012,  tokens_out: 8, cache_read: 90000, cache_write: 0 });
-        ds.logAi({ question: 'cold', answer: 'a', ok: true, model: SONNET, tokens_in: 120012, tokens_out: 8, cache_read: 0, cache_write: 120000 });
+        ds.logAi({ question: 'hit',  answer: 'a', ok: true, model: SONNET, ...HIT });
+        ds.logAi({ question: 'cold', answer: 'a', ok: true, model: SONNET, ...COLD });
         ds.logAi({ question: 'future model', answer: 'a', ok: true, model: 'claude-not-released', tokens_in: 1000, tokens_out: 100, cache_read: 0, cache_write: 0 });
 
         const after = ds.getSummary().aiUsage.last24h;
@@ -289,49 +299,111 @@ describe('token spend and cost', () => {
         // Fresh input is tokens_in minus the cached tokens it contains: 12 + 12 + 1000.
         assert.equal(after.inputTokens, before.inputTokens + 1024);
         assert.equal(after.totalTokens,
-            after.inputTokens + after.cacheReadTokens + after.cacheWriteTokens + after.outputTokens);
+            after.inputTokens + after.cacheReadTokens + after.cacheWriteTokens
+            + after.outputTokens + after.unsplitPromptTokens);
 
         // $0.018104 for the hit + $0.480104 for the miss. The unpriced row adds
         // nothing to the dollars but is counted so the UI can say the total is short.
         near(after.costUsd - before.costUsd, 0.498208, 'cost of one cache hit plus one cache write');
         assert.equal(after.unpricedAsks, before.unpricedAsks + 1);
+        assert.equal(after.uncostedAsks, after.unpricedAsks + after.unsplitAsks);
 
-        const models = after.byModel.map((m) => m.model);
-        assert.ok(models.includes(SONNET));
-        assert.ok(models.includes('claude-not-released'));
         const unpriced = after.byModel.find((m) => m.model === 'claude-not-released');
         assert.equal(unpriced.costUsd, null, 'an unknown rate must read as unknown, never as free');
         assert.equal(unpriced.inputTokens, 1000, 'its tokens are still counted');
+        assert.ok(after.byModel.some((m) => m.model === SONNET));
     });
 
-    test('a window that predates every row is empty rather than absent', () => {
-        const future = ds.getAiUsage(Date.now() + DAY);
-        assert.deepEqual(
-            { asks: future.asks, costUsd: future.costUsd, totalTokens: future.totalTokens, byModel: future.byModel },
-            { asks: 0, costUsd: 0, totalTokens: 0, byModel: [] }
-        );
+    test('a question lands in every window wider than its age, and no narrower one', () => {
+        // The windows nest, so a 10-day-old question belongs to 30d and all-time
+        // but not to 7d. Getting this wrong mislabels the whole spend table.
+        const base = ds.getAiUsage();
+        insertAt(2 * 60 * 60 * 1000, { question: 'w-2h',  model: SONNET, ...HIT });
+        insertAt(3 * DAY,            { question: 'w-3d',  model: SONNET, ...HIT });
+        insertAt(10 * DAY,           { question: 'w-10d', model: SONNET, ...HIT });
+        insertAt(40 * DAY,           { question: 'w-40d', model: SONNET, ...HIT });
+
+        const now = ds.getAiUsage();
+        const added = (k) => now[k].asks - base[k].asks;
+        assert.equal(added('last24h'), 1, 'only the 2-hour-old question is in the last 24 hours');
+        assert.equal(added('last7d'),  2, '24h questions are inside the 7-day window too');
+        assert.equal(added('last30d'), 3);
+        assert.equal(added('total'),   4);
+
+        // And the dollars move with them, one cache hit at a time.
+        near(now.last7d.costUsd - base.last7d.costUsd, 2 * 0.018104, '7d holds two of the four');
+        assert.ok(now.total.costUsd >= now.last30d.costUsd);
+        assert.ok(now.last30d.costUsd >= now.last7d.costUsd);
+        assert.ok(now.last7d.costUsd >= now.last24h.costUsd);
     });
 
-    test('rows written before the model column are priced, not dropped', () => {
-        // Exactly what an upgraded database holds: usage recorded, model NULL.
-        ds.logAi({ question: 'legacy', answer: 'a', ok: true, tokens_in: 90012, tokens_out: 8, cache_read: 90000, cache_write: 0 });
+    test('questions recorded before prompt-cache accounting are reported as uncosted, not billed as fresh input', () => {
+        // Rows older than the cache_read/cache_write columns have a real
+        // tokens_in and NULL cache columns. Treating that NULL as "nothing was
+        // cached" would bill ~96K cached tokens at the full input rate — about
+        // ten times over — and quietly inflate every window that reaches them.
+        const before = ds.getAiUsage().total;
+        insertAt(45 * DAY, { question: 'legacy, no cache columns', tokens_in: 96040, tokens_out: 500 });
+
+        const after = ds.getAiUsage().total;
+        assert.equal(after.asks, before.asks + 1);
+        assert.equal(after.unsplitAsks, before.unsplitAsks + 1);
+        assert.equal(after.unsplitPromptTokens, before.unsplitPromptTokens + 96040,
+            'its prompt tokens are counted, just not attributed to a priced column');
+        assert.equal(after.inputTokens, before.inputTokens,
+            'and above all not counted as fresh input');
+        near(after.costUsd - before.costUsd, 0, 'an unknowable split adds no dollars');
+
         const row = ds.getRecentAi(1)[0];
-        assert.equal(row.question, 'legacy');
-        assert.equal(row.model, null);
-        near(row.cost_usd, 0.018104, 'a NULL-model row is priced as the model that wrote it');
-
-        const byModel = ds.getAiUsage(0).byModel.map((m) => m.model);
-        assert.ok(byModel.includes(SONNET), 'legacy rows group under the model they were actually sent to');
-        assert.ok(!byModel.includes(null), 'no NULL bucket should reach the dashboard');
+        assert.equal(row.question, 'legacy, no cache columns');
+        assert.equal(row.cost_usd, null, 'the per-question column must say unknown, not $0.00');
     });
 
-    test('getRecentAi carries the model and the cost of each question', () => {
-        ds.logAi({ question: 'priced row', answer: 'a', ok: true, model: SONNET, tokens_in: 120012, tokens_out: 8, cache_read: 0, cache_write: 120000 });
-        const row = ds.getRecentAi(1)[0];
-        assert.equal(row.model, SONNET);
-        near(row.cost_usd, 0.480104, 'a cache-write question is the expensive one');
+    test('a window whose questions are all uncosted reports an unknown cost, not $0.00', () => {
+        // A fresh database of nothing but unpriceable questions must not render
+        // a confident zero over real spend.
+        const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'mtp-db2-'));
+        const sub = require('node:child_process').spawnSync(process.execPath, ['-e', `
+            process.env.DATA_DIR = ${JSON.stringify(dir)};
+            const d = require(${JSON.stringify(path.join(__dirname, '..', 'lib', 'db.js'))});
+            d.logAi({ question: 'q', answer: 'a', ok: true, model: 'claude-not-released', tokens_in: 1000, tokens_out: 10, cache_read: 0, cache_write: 0 });
+            const w = d.getAiUsage().last24h;
+            console.log(JSON.stringify({ asks: w.asks, costUsd: w.costUsd, uncosted: w.uncostedAsks }));
+        `], { encoding: 'utf8' });
+        fs.rmSync(dir, { recursive: true, force: true });
+        assert.equal(sub.status, 0, sub.stderr);
+        assert.deepEqual(JSON.parse(sub.stdout.trim()), { asks: 1, costUsd: null, uncosted: 1 });
+    });
 
+    test('impossible cache columns cannot subtract from the day\'s spend', () => {
+        // Defensive: the SQL clamps fresh input at 0 the same way the row-level
+        // helper does, so a corrupt row cannot produce negative dollars.
+        const before = ds.getAiUsage().last24h;
+        insertAt(1000, { question: 'impossible', model: SONNET, tokens_in: 100, tokens_out: 0, cache_read: 90000, cache_write: 0 });
+        const after = ds.getAiUsage().last24h;
+        assert.equal(after.inputTokens, before.inputTokens, 'clamped at zero, never negative');
+        assert.ok(after.costUsd > before.costUsd, 'the cached tokens it did report still cost something');
+    });
+
+    test('each question is priced at its own model rate, and the model reaches the dashboard', () => {
+        // Opus input is 2.5x Sonnet's, so the same tokens must not cost the same.
+        ds.logAi({ question: 'on opus', answer: 'a', ok: true, model: 'claude-opus-5', ...HIT });
+        const opusRow = ds.getRecentAi(1)[0];
+        assert.equal(opusRow.model, 'claude-opus-5');
+        near(opusRow.cost_usd, 0.04526, 'priced at the Opus rate, not the default');
+
+        ds.logAi({ question: 'on sonnet', answer: 'a', ok: true, model: SONNET, ...HIT });
+        near(ds.getRecentAi(1)[0].cost_usd, 0.018104, 'and the Sonnet row at the Sonnet rate');
+
+        const models = ds.getAiUsage().total.byModel.map((m) => m.model);
+        assert.ok(models.includes('claude-opus-5') && models.includes(SONNET));
+        assert.ok(!models.includes(null), 'no NULL bucket should reach the dashboard');
+    });
+
+    test('a call that reported no usage is a question that cost nothing', () => {
         ds.logAi({ question: 'no usage', ok: false, model: SONNET, error: 'timeout' });
-        assert.equal(ds.getRecentAi(1)[0].cost_usd, 0, 'a call that reported no usage cost nothing');
+        const row = ds.getRecentAi(1)[0];
+        assert.equal(row.cost_usd, 0, 'not null — nothing was spent, and that is known');
+        assert.equal(ds.getAiUsage().last24h.unsplitAsks >= 0, true);
     });
 });

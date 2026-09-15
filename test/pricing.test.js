@@ -8,8 +8,9 @@
 //      column at the full input rate prices ~100K cached tokens as fresh input
 //      on every single question — roughly 10x the real cost of a cache hit.
 //   2. A cache WRITE is not cheap. At the 1h TTL this app uses it is 2x fresh
-//      input, so a lost cache breakpoint is ~25x the cost of a hit, which is
-//      exactly the regression the dashboard exists to make visible.
+//      input against 0.1x for a read, so the same prompt costs 20x more when
+//      the breakpoint stops landing — exactly the regression the dashboard
+//      exists to make visible.
 //
 // The exact dollar amounts below are hand-computed from the rate table; if a
 // rate changes, they must be recomputed deliberately, not adjusted to match
@@ -124,15 +125,51 @@ describe('costOfRow — the stored row shape', () => {
         });
     });
 
-    test('rows from before the model column are priced as the model that wrote them', () => {
-        const legacy = { tokens_in: 90012, tokens_out: 8, cache_read: 90000, cache_write: 0, model: null };
-        const explicit = { ...legacy, model: pricing.LEGACY_MODEL };
-        assert.equal(pricing.costOfRow(legacy), pricing.costOfRow(explicit));
-        assert.ok(pricing.costOfRow(legacy) > 0);
+    test('each row is priced at ITS model rate, not a default', () => {
+        // The whole reason ai_messages carries a `model` column. Opus input is
+        // 2.5x Sonnet's, so a row that ignores the column is off by that much.
+        const usage = { tokens_in: 90012, tokens_out: 8, cache_read: 90000, cache_write: 0 };
+        const sonnet = pricing.costOfRow({ ...usage, model: 'claude-sonnet-5' });
+        const opus   = pricing.costOfRow({ ...usage, model: 'claude-opus-5' });
+        assert.equal(pricing.roundUsd(sonnet), 0.018104);
+        assert.equal(pricing.roundUsd(opus), 0.04526);
+        assert.ok(opus > sonnet * 2, 'a dearer model must cost more for identical tokens');
     });
 
-    test('a row that never reported usage costs nothing, and no row can cost less than nothing', () => {
-        assert.equal(pricing.costOfRow({ tokens_in: null, tokens_out: null, cache_read: null, cache_write: null }), 0);
+    test('rows from before the model column are priced as the model that wrote them', () => {
+        const legacy = { tokens_in: 90012, tokens_out: 8, cache_read: 90000, cache_write: 0, model: null };
+        // Computed from the rate table directly, so this cannot pass by both
+        // sides routing through the same `row.model || LEGACY_MODEL` expression.
+        const rates = pricing.RATES[pricing.LEGACY_MODEL];
+        const expected = (12 * rates.input + 90000 * rates.input * pricing.CACHE_READ_MULTIPLE + 8 * rates.output) / 1e6;
+        assert.equal(pricing.roundUsd(pricing.costOfRow(legacy)), pricing.roundUsd(expected));
+        assert.notEqual(pricing.LEGACY_MODEL, 'claude-opus-5');
+        assert.notEqual(pricing.roundUsd(pricing.costOfRow(legacy)),
+            pricing.roundUsd(pricing.costOfRow({ ...legacy, model: 'claude-opus-5' })));
+    });
+
+    test('a row that recorded prompt tokens but no cache split cannot be priced', () => {
+        // cache_read/cache_write were added on 2026-09-14. Older rows have a
+        // real tokens_in (~96K, nearly all of it the cached knowledge base) and
+        // NULL cache columns. Reading that NULL as "nothing was cached" bills
+        // the whole prompt at the fresh-input rate — about ten times over.
+        const legacy = { tokens_in: 96040, tokens_out: 500, cache_read: null, cache_write: null, model: 'claude-sonnet-5' };
+        assert.equal(pricing.hasCacheSplit(legacy), false);
+        assert.equal(pricing.costOfRow(legacy), null, 'unknown must not be rendered as a number');
+
+        const naive = pricing.costOf({ model: 'claude-sonnet-5', inputTokens: 96040, outputTokens: 500 });
+        const honest = pricing.costOfRow({ ...legacy, cache_read: 96000, cache_write: 0 });
+        assert.ok(naive > honest * 8, 'this is the size of the mistake being avoided');
+    });
+
+    test('a row that reported no usage at all is priced at zero, not unknown', () => {
+        // A failed call really did cost nothing — that is knowledge, not a gap.
+        const failed = { tokens_in: null, tokens_out: null, cache_read: null, cache_write: null, model: 'claude-sonnet-5' };
+        assert.equal(pricing.hasCacheSplit(failed), true);
+        assert.equal(pricing.costOfRow(failed), 0);
+    });
+
+    test('no row can cost less than nothing', () => {
         // Defensive: cache columns larger than tokens_in must not go negative
         // and quietly subtract from the day's spend.
         const impossible = { tokens_in: 100, cache_read: 90000, cache_write: 0, tokens_out: 0, model: SONNET };

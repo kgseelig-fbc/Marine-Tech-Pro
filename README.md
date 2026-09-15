@@ -30,7 +30,7 @@ npm run check     # syntax-checks every shipped JS file, then validates the data
 npm run validate  # data validation only
 ```
 
-The suites need no API key or network: the Ask-a-Tech tests point the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL`. CI (`.github/workflows/ci.yml`) runs `npm run check`, the tests, and a production dependency audit on every pull request and on every push to `main`.
+The suites need no API key or network: the Ask-a-Tech tests point the real `/api/ask` handler at a local mock via `ANTHROPIC_BASE_URL`. `npm run check` syntax-checks every shipped JS file, parses the inline `<script>` blocks in the HTML pages, and validates the domain data. CI (`.github/workflows/ci.yml`) runs it, the tests, and a production dependency audit on every pull request and on every push to `main`.
 
 ## Deploy on Railway
 
@@ -93,9 +93,9 @@ Deleting a user from `/admin` also removes their usage events and AI transcripts
 
 The figure is computed from the token counts on each stored question, priced with Anthropic's published list prices in `lib/pricing.js` — it estimates the API line on the bill, it is not the bill. Three things are worth knowing when reading it:
 
-- **Input, cache reads and cache writes are priced differently** and shown in separate columns. A cached prompt token costs a tenth of a fresh one; writing the cache costs double. The knowledge base is ~100K tokens, so a question that reads the cache costs about two cents and the same question that rewrites it costs about fifty — which is what the cache hit rate on the same page is warning about.
+- **Input, cache reads and cache writes are priced differently** and shown in separate columns. A cached prompt token costs a tenth of a fresh one; writing the cache costs double. The knowledge base is ~100K tokens, so a question that reads the cache costs about two cents and the same question that rewrites it costs about forty — which is what the cache hit rate on the same page is warning about.
 - **`All recorded` ends where pruning does.** Rows older than `RETENTION_DAYS` (default 90) are gone, so on a long-lived instance this is a 90-day total, not a lifetime one.
-- **Rates go stale.** They were checked in September 2026. If a question is answered by a model with no rate in `lib/pricing.js`, its tokens still count but its dollars are left out, and the dashboard says how many questions that covers rather than quietly under-reporting. Changing the model in `server.js` means adding its rate in the same commit.
+- **Some questions cannot be priced, and the page says which.** Rates were checked in September 2026: a question answered by a model with no rate in `lib/pricing.js` has its tokens counted but its dollars left out. The same goes for questions recorded before the app tracked prompt-cache use, whose prompt tokens cannot be split between the three different prices. Both are reported under the table rather than quietly folded into the total, a cost that is short is marked with a `+`, and a window with nothing priceable shows `?` instead of `$0.00`. Changing the model in `server.js` means adding its rate in the same commit.
 
 ## Data and privacy notes for operators
 

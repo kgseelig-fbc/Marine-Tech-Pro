@@ -175,6 +175,13 @@ describe('what the admin dashboard can see afterwards', () => {
             'the overview must carry all four spend windows');
         assert.ok(usage.last24h.costUsd >= 0.018104,
             `24h cost ${usage.last24h.costUsd} should include this question`);
+        // Bounded from above as well: every question this suite asks is a cache
+        // hit worth about two cents, so a total anywhere near the naive
+        // "price tokens_in as fresh input" figure (~18c each) is the headline
+        // bug, and a one-sided assertion would sail straight past it.
+        assert.ok(usage.last24h.costUsd < usage.last24h.asks * 0.05,
+            `24h cost ${usage.last24h.costUsd} over ${usage.last24h.asks} cached asks looks like cached tokens billed as fresh input`);
+        assert.equal(usage.last24h.unsplitAsks, 0, 'every question here recorded its cache split');
         assert.ok(usage.last24h.asks >= 1);
         assert.equal(usage.last24h.unpricedAsks, 0, 'the model in use must have a published rate');
         assert.ok(usage.last24h.byModel.some((m) => m.model === 'claude-sonnet-5'));
@@ -192,7 +199,10 @@ describe('what the admin dashboard can see afterwards', () => {
         const after = (await overview()).summary.aiUsage.last24h;
         assert.ok(after.asks > before.asks, 'a failed question is still a question');
         assert.equal(after.costUsd, before.costUsd, 'no usage was reported, so nothing is billed');
-        assert.equal((await overview()).recentAi[0].cost_usd, 0);
+        const row = (await overview()).recentAi[0];
+        assert.equal(row.cost_usd, 0);
+        assert.equal(row.model, 'claude-sonnet-5',
+            'the failed call still records which model was attempted');
     });
 });
 
